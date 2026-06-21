@@ -1,9 +1,0 @@
-# clasp credentials (ห้ามขึ้น GitHub เด็ดขาด!)
-.clasprc.json
-
-# node modules (ถ้ามี)
-node_modules/
-
-# OS files
-.DS_Store
-Thumbs.db
