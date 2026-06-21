@@ -504,6 +504,85 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
 </div>
 
 <script>
+  // 🌟 นำลิงก์ Web App URL ที่ก๊อปปี้มาจากขั้นตอนที่ 2 มาวางตรงนี้ 🌟
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzgM4Gufw8iBb05q7Qi-Ok4zH329qL-2YUHyPNCGc9ywOsDjCMdjtNMteGwQ1qIggia-A/exec";
+
+// จำลองระบบ google.script.run เพื่อให้โค้ดส่วนอื่นทำงานได้โดยไม่ต้องแก้ไขอะไรเลย
+if (typeof google === 'undefined' || !google.script) {
+  window.google = {
+    script: {
+      run: {
+        _successHandler: null,
+        _failureHandler: null,
+        withSuccessHandler: function(handler) {
+          this._successHandler = handler;
+          return this;
+        },
+        withFailureHandler: function(handler) {
+          this._failureHandler = handler;
+          return this;
+        },
+        getSubjects: function() {
+          fetch(`${WEB_APP_URL}?action=getSubjects`)
+            .then(res => res.json())
+            .then(data => { if(this._successHandler) this._successHandler(data); })
+            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+        },
+        getStudentsBySubject: function(subject) {
+          fetch(`${WEB_APP_URL}?action=getStudentsBySubject&subject=${encodeURIComponent(subject)}`)
+            .then(res => res.json())
+            .then(data => { if(this._successHandler) this._successHandler(data); })
+            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+        },
+        getTodayLog: function(subject) {
+          fetch(`${WEB_APP_URL}?action=getTodayLog&subject=${encodeURIComponent(subject)}`)
+            .then(res => res.json())
+            .then(data => { if(this._successHandler) this._successHandler(data); })
+            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+        },
+        getLogSheets: function() {
+          fetch(`${WEB_APP_URL}?action=getLogSheets`)
+            .then(res => res.json())
+            .then(data => { if(this._successHandler) this._successHandler(data); })
+            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+        },
+        getSummaryBySheet: function(sheetName) {
+          fetch(`${WEB_APP_URL}?action=getSummaryBySheet&sheetName=${encodeURIComponent(sheetName)}`)
+            .then(res => res.json())
+            .then(data => { if(this._successHandler) this._successHandler(data); })
+            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+        },
+        getSpreadsheetUrl: function() {
+          fetch(`${WEB_APP_URL}?action=getSpreadsheetUrl`)
+            .then(res => res.json())
+            .then(data => { if(this._successHandler) this._successHandler(data); })
+            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+        },
+        logAttendance: function(subject, name, status, note) {
+          // ใช้ Content-Type: text/plain เพื่อหลีกเลี่ยงปัญหา CORS บล็อกบนบราวเซอร์เมื่อยิงข้ามโดเมน
+          fetch(WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'logAttendance', subject, name, status, note })
+          })
+            .then(res => res.json())
+            .then(data => { if(this._successHandler) this._successHandler(data); })
+            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+        },
+        clearTodayLog: function(subject) {
+          fetch(WEB_APP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'clearTodayLog', subject })
+          })
+            .then(res => res.json())
+            .then(data => { if(this._successHandler) this._successHandler(data); })
+            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+        }
+      }
+    }
+  };
+}
 /* ════════════════════════════════════════════════════════
    DEVICE DETECTION  (แก้ Bug #6 — ตรวจ iOS+SR แยากัน)
 ════════════════════════════════════════════════════════ */
