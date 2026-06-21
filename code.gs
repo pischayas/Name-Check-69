@@ -4,7 +4,7 @@
 // บันทึกแยกรายวิชา: Sheet "[บันทึก] วิชา | DD/MM/BBBB"
 // ============================================================
 
-const SHEET_ID  = 'YOUR_SPREADSHEET_ID';  // ← ใส่ ID ของ Spreadsheet
+const SHEET_ID  = '468895986';  // ← ใส่ ID ของ Spreadsheet
 const NAME_COL  = 1;   // คอลัมน์ A = ชื่อนักเรียน
 const DATA_START = 1;  // แถวเริ่มต้นข้อมูล (1 = ไม่มี header ในชีทวิชา)
 const LOG_MARK  = '[บันทึก]'; // prefix ของ Sheet บันทึก
@@ -32,7 +32,7 @@ function doGet() {
 // ──────────────────────────────────────────────────────────
 
 function getSS() {
-  return SHEET_ID !== 'YOUR_SPREADSHEET_ID'
+  return SHEET_ID !== '468895986'
     ? SpreadsheetApp.openById(SHEET_ID)
     : SpreadsheetApp.getActiveSpreadsheet();
 }
@@ -226,37 +226,4 @@ function ping() {
 // รัน setup() ครั้งแรกเพื่อตรวจ Spreadsheet URL
 function setup() {
   Logger.log('SS URL: ' + getSS().getUrl());
-}
-// ----------------------------------------------------
-// ระบบ API สำหรับรับ-ส่งข้อมูลกับ GitHub Pages
-// ----------------------------------------------------
-function doPost(e) {
-  let output = { status: 'success', data: null };
-
-  try {
-    // รับค่าที่ส่งมาจาก GitHub
-    let payload = JSON.parse(e.postData.contents);
-    let action = payload.action;
-    let args = payload.args || [];
-
-    // วิ่งไปหาฟังก์ชันเดิมที่คุณเขียนไว้แล้ว
-    if (action === 'ping') output.data = true;
-    else if (action === 'getSpreadsheetUrl') output.data = getSpreadsheetUrl();
-    else if (action === 'getSubjects') output.data = getSubjects();
-    else if (action === 'getStudentsBySubject') output.data = getStudentsBySubject(args[0]);
-    else if (action === 'getTodayLog') output.data = getTodayLog(args[0]);
-    else if (action === 'logAttendance') output.data = logAttendance(args[0], args[1], args[2], args[3]);
-    else if (action === 'getLogSheets') output.data = getLogSheets();
-    else if (action === 'getSummaryBySheet') output.data = getSummaryBySheet(args[0]);
-    else if (action === 'clearTodayLog') output.data = clearTodayLog(args[0]);
-    else throw new Error("ไม่พบคำสั่ง: " + action);
-
-  } catch (err) {
-    output.status = 'error';
-    output.error = err.message;
-  }
-
-  // ส่งข้อมูลกลับไปให้เว็บที่ GitHub
-  return ContentService.createTextOutput(JSON.stringify(output))
-    .setMimeType(ContentService.MimeType.JSON);
 }
