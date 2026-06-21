@@ -504,10 +504,9 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
 </div>
 
 <script>
-  // 🌟 นำลิงก์ Web App URL ที่ก๊อปปี้มาจากขั้นตอนที่ 2 มาวางตรงนี้ 🌟
+// 🌟 เปลี่ยนตรงนี้ให้เป็น URL ของ Web App เส้นปัจจุบันของคุณ 🌟
 const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzgM4Gufw8iBb05q7Qi-Ok4zH329qL-2YUHyPNCGc9ywOsDjCMdjtNMteGwQ1qIggia-A/exec";
 
-// จำลองระบบ google.script.run เพื่อให้โค้ดส่วนอื่นทำงานได้โดยไม่ต้องแก้ไขอะไรเลย
 if (typeof google === 'undefined' || !google.script) {
   window.google = {
     script: {
@@ -522,62 +521,69 @@ if (typeof google === 'undefined' || !google.script) {
           this._failureHandler = handler;
           return this;
         },
+        // ฟังก์ชันหัวใจหลักในการดึงข้อมูลแบบหลบเลี่ยงปัญหา CORS & Redirect
+        _fetchGet: function(action, extraParams = "") {
+          fetch(`${WEB_APP_URL}?action=${action}${extraParams}`, {
+            method: "GET",
+            mode: "cors"
+          })
+          .then(res => {
+            if (!res.ok) throw new Error("เครือข่ายมีปัญหาไม่สามารถติดต่อ Google Apps Script ได้");
+            return res.json();
+          })
+          .then(data => {
+            // ดักจับกรณีส่งกลับมาเป็น Object ผิดพลาด หรือส่งมาไม่มีข้อมูล ให้กลายเป็น Array ว่างเพื่อไม่ให้ระเบิด
+            const finalData = Array.isArray(data) ? data : (data.rows ? data.rows : []);
+            if (this._successHandler) this._successHandler(finalData);
+          })
+          .catch(err => {
+            console.error("Fetch Error:", err);
+            if (this._failureHandler) this._failureHandler(err);
+          });
+        },
         getSubjects: function() {
-          fetch(`${WEB_APP_URL}?action=getSubjects`)
-            .then(res => res.json())
-            .then(data => { if(this._successHandler) this._successHandler(data); })
-            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+          this._fetchGet('getSubjects');
         },
         getStudentsBySubject: function(subject) {
-          fetch(`${WEB_APP_URL}?action=getStudentsBySubject&subject=${encodeURIComponent(subject)}`)
-            .then(res => res.json())
-            .then(data => { if(this._successHandler) this._successHandler(data); })
-            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+          this._fetchGet('getStudentsBySubject', `&subject=${encodeURIComponent(subject)}`);
         },
         getTodayLog: function(subject) {
-          fetch(`${WEB_APP_URL}?action=getTodayLog&subject=${encodeURIComponent(subject)}`)
-            .then(res => res.json())
-            .then(data => { if(this._successHandler) this._successHandler(data); })
-            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+          this._fetchGet('getTodayLog', `&subject=${encodeURIComponent(subject)}`);
         },
         getLogSheets: function() {
-          fetch(`${WEB_APP_URL}?action=getLogSheets`)
-            .then(res => res.json())
-            .then(data => { if(this._successHandler) this._successHandler(data); })
-            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+          this._fetchGet('getLogSheets');
         },
         getSummaryBySheet: function(sheetName) {
           fetch(`${WEB_APP_URL}?action=getSummaryBySheet&sheetName=${encodeURIComponent(sheetName)}`)
             .then(res => res.json())
-            .then(data => { if(this._successHandler) this._successHandler(data); })
-            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+            .then(data => { if (this._successHandler) this._successHandler(data); })
+            .catch(err => { if (this._failureHandler) this._failureHandler(err); });
         },
         getSpreadsheetUrl: function() {
           fetch(`${WEB_APP_URL}?action=getSpreadsheetUrl`)
             .then(res => res.json())
-            .then(data => { if(this._successHandler) this._successHandler(data); })
-            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+            .then(data => { if (this._successHandler) this._successHandler(data); })
+            .catch(err => { if (this._failureHandler) this._failureHandler(err); });
         },
         logAttendance: function(subject, name, status, note) {
-          // ใช้ Content-Type: text/plain เพื่อหลีกเลี่ยงปัญหา CORS บล็อกบนบราวเซอร์เมื่อยิงข้ามโดเมน
           fetch(WEB_APP_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'logAttendance', subject, name, status, note })
           })
-            .then(res => res.json())
-            .then(data => { if(this._successHandler) this._successHandler(data); })
-            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+          .then(res => res.json())
+          .then(data => { if(this._successHandler) this._successHandler(data); })
+          .catch(err => { if(this._failureHandler) this._failureHandler(err); });
         },
         clearTodayLog: function(subject) {
           fetch(WEB_APP_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify({ action: 'clearTodayLog', subject })
           })
-            .then(res => res.json())
-            .then(data => { if(this._successHandler) this._successHandler(data); })
-            .catch(err => { if(this._failureHandler) this._failureHandler(err); });
+          .then(res => res.json())
+          .then(data => { if(this._successHandler) this._successHandler(data); })
+          .catch(err => { if(this._failureHandler) this._failureHandler(err); });
         }
       }
     }
