@@ -514,19 +514,18 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
    2. Execute as: Me, Who has access: Anyone
    3. คัดลอก URL มาใส่ด้านล่าง
 ════════════════════════════════════════════════════════ */
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9m6VzGYBbuvjRCNwbzofB5WrbQkymMvzmK-GjGKF0J2Sn8mdu4W-l5nQR3A1o6Io/exec";
+const WEB_APP_URL = "YOUR_WEB_APP_URL_HERE";
 // ตัวอย่าง: "https://script.google.com/macros/s/AKfycbz.../exec"
 
 /* ════════════════════════════════════════════════════════
    API LAYER — fetch ไปยัง Apps Script REST
+   - ใช้ no-cors ไม่ได้ (อ่าน response ไม่ได้) → ใช้ redirect:follow
+   - Apps Script จะ redirect 1 ครั้ง → browser ตาม redirect เอง
 ════════════════════════════════════════════════════════ */
 const API = {
   async get(action, params = {}) {
     const qs = new URLSearchParams({ action, ...params }).toString();
-    const res = await fetch(`${WEB_APP_URL}?${qs}`, {
-      method: 'GET',
-      redirect: 'follow'
-    });
+    const res = await fetch(`${WEB_APP_URL}?${qs}`, { redirect: 'follow' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return res.json();
   },
@@ -542,6 +541,18 @@ const API = {
   }
 };
 
+/* ════════════════════════════════════════════════════════
+   INIT CACHE — โหลด ping + subjects + sheetUrl พร้อมกันใน 1 request
+   แก้ปัญหา cold start ทำให้โหลดช้า
+════════════════════════════════════════════════════════ */
+let _initData = null; // cache ผลจาก init request
+
+async function fetchInit() {
+  const res = await API.get('init');
+  _initData = res;
+  return res;
+}
+
 /* เชื่อม google.script.run interface เพื่อให้โค้ดเดิมทำงานได้โดยไม่ต้องแก้ */
 window.google = {
   script: {
@@ -552,15 +563,33 @@ window.google = {
       _ok(d)  { if (this._sh) this._sh(d); this._sh = null; this._fh = null; },
       _err(e) { if (this._fh) this._fh(e); this._sh = null; this._fh = null; },
 
+      // ping ใช้ init cache แทน — ไม่ต้องยิง request แยก
       ping() {
-        API.get('ping')
+        fetchInit()
           .then(d => this._ok(d))
           .catch(e => this._err(e));
       },
+      // getSubjects ดึงจาก cache ที่ init โหลดมาแล้ว
       getSubjects() {
-        API.get('getSubjects')
-          .then(d => this._ok(Array.isArray(d) ? d : []))
-          .catch(e => this._err(e));
+        if (_initData && _initData.subjects) {
+          const d = _initData.subjects;
+          setTimeout(() => this._ok(Array.isArray(d) ? d : []), 0);
+        } else {
+          API.get('getSubjects')
+            .then(d => this._ok(Array.isArray(d) ? d : []))
+            .catch(e => this._err(e));
+        }
+      },
+      // getSpreadsheetUrl ดึงจาก cache เช่นกัน
+      getSpreadsheetUrl() {
+        if (_initData && _initData.sheetUrl) {
+          const u = _initData.sheetUrl;
+          setTimeout(() => this._ok(u), 0);
+        } else {
+          API.get('getSpreadsheetUrl')
+            .then(d => this._ok(d))
+            .catch(e => this._err(e));
+        }
       },
       getStudentsBySubject(subject) {
         API.get('getStudentsBySubject', { subject })
@@ -572,6 +601,12 @@ window.google = {
           .then(d => this._ok(Array.isArray(d) ? d : []))
           .catch(e => this._err(e));
       },
+      // โหลด students + todayLog พร้อมกันใน 1 request
+      getStudentsAndLog(subject) {
+        API.get('getStudentsAndLog', { subject })
+          .then(d => this._ok(d))
+          .catch(e => this._err(e));
+      },
       getLogSheets() {
         API.get('getLogSheets')
           .then(d => this._ok(Array.isArray(d) ? d : []))
@@ -579,11 +614,6 @@ window.google = {
       },
       getSummaryBySheet(sheetName) {
         API.get('getSummaryBySheet', { sheetName })
-          .then(d => this._ok(d))
-          .catch(e => this._err(e));
-      },
-      getSpreadsheetUrl() {
-        API.get('getSpreadsheetUrl')
           .then(d => this._ok(d))
           .catch(e => this._err(e));
       },
@@ -917,36 +947,37 @@ function selSubj(name) {
   document.getElementById('cprog').style.display='none';
   setStatus('กำลังโหลดรายชื่อ…','');
   setLoad(true,'กำลังโหลด '+name+'…');
-  google.script.run
-    .withSuccessHandler(res=>{
-      if(res.error){setLoad(false);toast(res.error);return;}
-      students=(res.students||[]).map(s=>({...s,_st:'pending'}));
-      syncLog();
+  // โหลด students + todayLog พร้อมกันใน 1 request เดียว (เร็วกว่าเดิม ~2x)
+  API.get('getStudentsAndLog', { subject: name })
+    .then(res => {
+      if(res.error){ setLoad(false); toast(res.error); return; }
+      students = (res.students||[]).map(s=>({...s,_st:'pending'}));
+      applyLog(res.logs||[]);
     })
-    .withFailureHandler(()=>{setLoad(false);toast('โหลดรายชื่อไม่ได้');})
-    .getStudentsBySubject(name);
+    .catch(()=>{ setLoad(false); toast('โหลดรายชื่อไม่ได้'); });
 }
-function reloadStudents(){if(curSubj)selSubj(curSubj);}
+function reloadStudents(){ if(curSubj) selSubj(curSubj); }
+
+function applyLog(logs) {
+  logs.forEach(r=>{
+    const s=students.find(x=>x.name===r.name);
+    if(s&&s._st==='pending')
+      s._st=r.status.includes('มา')?'present':r.status.includes('ลา')?'leave':'absent';
+  });
+  let fi=students.findIndex(s=>s._st==='pending'); callIdx=fi>=0?fi:0;
+  renderList(); updateStats(); setLoad(false);
+  const canCall=SR_OK&&micGranted||(IS_IOS&&SR_OK);
+  document.getElementById('callBtn').disabled=!students.length||!canCall;
+  setStatus(!SR_OK?'❌ ใช้ Chrome หรือ Safari เท่านั้น':
+            (!micGranted&&!IS_IOS)?'🎤 กรุณาอนุญาตไมค์ก่อน':'กดปุ่ม ▶ เพื่อเริ่มเรียกชื่อ',
+            !SR_OK||(!micGranted&&!IS_IOS)?'miss':'');
+}
+
 function syncLog(){
+  // ใช้สำหรับ refresh log หลังบันทึกเท่านั้น (ไม่ใช่ตอนโหลดวิชา)
   google.script.run
-    .withSuccessHandler(logs=>{
-      (logs||[]).forEach(r=>{
-        const s=students.find(x=>x.name===r.name);
-        if(s&&s._st==='pending')s._st=r.status.includes('มา')?'present':r.status.includes('ลา')?'leave':'absent';
-      });
-      let fi=students.findIndex(s=>s._st==='pending'); callIdx=fi>=0?fi:0;
-      renderList(); updateStats(); setLoad(false);
-      const canCall = SR_OK&&micGranted || (IS_IOS&&SR_OK);
-      document.getElementById('callBtn').disabled=!students.length||!canCall;
-      setStatus(!SR_OK?'❌ ใช้ Chrome หรือ Safari เท่านั้น':
-                (!micGranted&&!IS_IOS)?'🎤 กรุณาอนุญาตไมค์ก่อน':'กดปุ่ม ▶ เพื่อเริ่มเรียกชื่อ',
-                !SR_OK||(!micGranted&&!IS_IOS)?'miss':'');
-    })
-    .withFailureHandler(()=>{
-      renderList(); updateStats(); setLoad(false);
-      document.getElementById('callBtn').disabled=!students.length;
-      setStatus('กดปุ่ม ▶ เพื่อเริ่มเรียกชื่อ','');
-    })
+    .withSuccessHandler(logs=>{ applyLog(logs||[]); })
+    .withFailureHandler(()=>{})
     .getTodayLog(curSubj);
 }
 
