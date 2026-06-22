@@ -336,7 +336,7 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
   <span style="font-size:1.3rem;flex-shrink:0">⚙️</span>
   <div>
     <strong>ยังไม่ได้ตั้งค่า Apps Script URL</strong>
-    แก้ไขค่า <code>https://script.google.com/macros/library/d/1rji2DjupTUTxI9_UtDhxaBHF3GuARnW7y43s_-fhZpEoo3euiAWTDe1N/2</code> ในไฟล์ <code>index.html</code> ให้เป็น URL ของ Web App ที่ deploy แล้ว
+    แก้ไขค่า <code>WEB_APP_URL</code> ในไฟล์ <code>index.html</code> ให้เป็น URL ของ Web App ที่ deploy แล้ว
     <br>ดูวิธีตั้งค่าใน <code>README.md</code>
   </div>
 </div>
@@ -514,7 +514,7 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
    2. Execute as: Me, Who has access: Anyone
    3. คัดลอก URL มาใส่ด้านล่าง
 ════════════════════════════════════════════════════════ */
-const https://script.google.com/macros/library/d/1rji2DjupTUTxI9_UtDhxaBHF3GuARnW7y43s_-fhZpEoo3euiAWTDe1N/2 = "https://script.google.com/macros/s/AKfycby9m6VzGYBbuvjRCNwbzofB5WrbQkymMvzmK-GjGKF0J2Sn8mdu4W-l5nQR3A1o6Io/exec";
+const WEB_APP_URL = "YOUR_WEB_APP_URL_HERE";
 // ตัวอย่าง: "https://script.google.com/macros/s/AKfycbz.../exec"
 
 /* ════════════════════════════════════════════════════════
@@ -558,11 +558,11 @@ async function proxyGet(targetUrl) {
 const API = {
   async get(action, params = {}) {
     const qs = new URLSearchParams({ action, ...params }).toString();
-    return proxyGet(`${https://script.google.com/macros/library/d/1rji2DjupTUTxI9_UtDhxaBHF3GuARnW7y43s_-fhZpEoo3euiAWTDe1N/2}?${qs}`);
+    return proxyGet(`${WEB_APP_URL}?${qs}`);
   },
   async post(body) {
     // POST ส่งตรงได้เลย — Apps Script ไม่ redirect POST
-    const res = await fetch(https://script.google.com/macros/library/d/1rji2DjupTUTxI9_UtDhxaBHF3GuARnW7y43s_-fhZpEoo3euiAWTDe1N/2, {
+    const res = await fetch(WEB_APP_URL, {
       method: 'POST',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -697,10 +697,10 @@ const KW = {
 ════════════════════════════════════════════════════════ */
 window.addEventListener('load', () => {
   // แสดง warning ถ้ายังไม่ได้ตั้ง URL
-  if (https://script.google.com/macros/library/d/1rji2DjupTUTxI9_UtDhxaBHF3GuARnW7y43s_-fhZpEoo3euiAWTDe1N/2 === 'YOUR_https://script.google.com/macros/library/d/1rji2DjupTUTxI9_UtDhxaBHF3GuARnW7y43s_-fhZpEoo3euiAWTDe1N/2_HERE') {
+  if (WEB_APP_URL === 'YOUR_WEB_APP_URL_HERE') {
     document.getElementById('setupBanner').classList.add('show');
     document.getElementById('overlay').classList.add('hide');
-    setStatus('⚙️ กรุณาตั้งค่า https://script.google.com/macros/library/d/1rji2DjupTUTxI9_UtDhxaBHF3GuARnW7y43s_-fhZpEoo3euiAWTDe1N/2 ก่อน','miss');
+    setStatus('⚙️ กรุณาตั้งค่า WEB_APP_URL ก่อน','miss');
     return;
   }
 
@@ -717,7 +717,7 @@ window.addEventListener('load', () => {
 
   let tmr = setTimeout(() => {
     document.getElementById('overlay').classList.add('hide');
-    setStatus('⏱ เชื่อมต่อช้า — ตรวจสอบ https://script.google.com/macros/library/d/1rji2DjupTUTxI9_UtDhxaBHF3GuARnW7y43s_-fhZpEoo3euiAWTDe1N/2 หรือกด รีโหลด','miss');
+    setStatus('⏱ เชื่อมต่อช้า — ตรวจสอบ WEB_APP_URL หรือกด รีโหลด','miss');
   }, 15000);
 
   google.script.run
@@ -732,7 +732,7 @@ window.addEventListener('load', () => {
     .withFailureHandler(e => {
       clearTimeout(tmr);
       document.getElementById('overlay').classList.add('hide');
-      setStatus('❌ เชื่อมต่อไม่ได้: '+(e.message||'ตรวจสอบ https://script.google.com/macros/library/d/1rji2DjupTUTxI9_UtDhxaBHF3GuARnW7y43s_-fhZpEoo3euiAWTDe1N/2'),'miss');
+      setStatus('❌ เชื่อมต่อไม่ได้: '+(e.message||'ตรวจสอบ WEB_APP_URL'),'miss');
     })
     .ping();
 
