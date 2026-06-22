@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ระบบเรียกชื่อเช็คชื่อ</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF2F8;--sur:#fff;--s2:#F0F4FA;--bdr:#DDE3EE;
+  --acc:#1A73E8;--adk:#1558B0;
+  --grn:#1E8E3E;--gbg:#E6F4EA;--gbr:#B7DFBF;
+  --red:#D93025;--rbg:#FCE8E6;--rbr:#F5C6C2;
+  --pur:#7B1FA2;--pbg:#F3E5F5;--pbr:#CE93D8;
+  --amb:#E37400;--abg:#FEF7E0;
+  --txt:#202124;--t2:#5F6368;--t3:#9AA0A6;
+  --r:12px;--rs:8px;
+  --sh:0 1px 3px rgba(60,64,67,.14),0 1px 2px rgba(60,64,67,.1);
+  --shm:0 4px 14px rgba(60,64,67,.15);
+  --touch:52px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;
+     -webkit-font-smoothing:antialiased;touch-action:pan-y}
+
+/* ── SETUP BANNER ── */
+#setupBanner{background:linear-gradient(135deg,#fff3cd,#fff8e1);border-bottom:2px solid #ffc107;
+  padding:12px 16px;font-size:.82rem;color:#7c5c00;display:none;gap:8px;align-items:flex-start}
+#setupBanner.show{display:flex}
+#setupBanner strong{display:block;font-size:.9rem;margin-bottom:4px}
+
+/* ── APP BAR ── */
+.bar{position:sticky;top:0;z-index:300;background:var(--acc);color:#fff;height:56px;padding:0 16px;
+     display:flex;align-items:center;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.bar-title{font-size:1rem;font-weight:700;flex:1}
+.bar-date{font-size:.72rem;opacity:.9;background:rgba(255,255,255,.18);padding:3px 9px;border-radius:20px;white-space:nowrap}
+.dev-badge{font-size:.65rem;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);
+           padding:2px 8px;border-radius:20px;white-space:nowrap;display:none}
+#sheetLink{color:#fff;opacity:.85;font-size:.72rem;background:rgba(255,255,255,.15);
+           padding:3px 9px;border-radius:20px;text-decoration:none;white-space:nowrap;flex-shrink:0}
+
+/* ── SUBJECT BAR ── */
+.sbar{background:var(--sur);border-bottom:1px solid var(--bdr);padding:0 14px;display:flex;
+      align-items:center;gap:8px;min-height:48px;position:sticky;top:56px;z-index:200;
+      box-shadow:0 1px 3px rgba(60,64,67,.07)}
+.sbar-lbl{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t2);white-space:nowrap}
+.stabs{display:flex;gap:5px;overflow-x:auto;flex:1;padding:6px 0;scrollbar-width:none}
+.stabs::-webkit-scrollbar{display:none}
+.stab{font-family:'Sarabun',sans-serif;font-size:.83rem;font-weight:600;background:var(--s2);
+      border:1.5px solid var(--bdr);border-radius:20px;color:var(--t2);padding:6px 14px;
+      cursor:pointer;white-space:nowrap;transition:all .15s;flex-shrink:0;
+      min-height:38px;display:inline-flex;align-items:center}
+.stab:hover{border-color:var(--acc);color:var(--acc)}
+.stab.active{background:var(--acc);border-color:var(--acc);color:#fff}
+.rbtn{font-family:'Sarabun',sans-serif;font-size:.75rem;font-weight:600;background:none;
+      border:1.5px solid var(--bdr);border-radius:var(--rs);color:var(--t2);padding:6px 10px;
+      cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0;min-height:38px}
+.rbtn:hover{border-color:var(--acc);color:var(--acc)}
+
+/* ── LAYOUT ── */
+.main{max-width:1100px;margin:0 auto;padding:16px 14px 48px;
+      display:grid;grid-template-columns:300px 1fr;gap:16px}
+@media(max-width:860px){.main{grid-template-columns:1fr;padding:12px 10px 60px}}
+
+/* ── CARD ── */
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.ch{padding:10px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:7px}
+.cht{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--t2);flex:1}
+.cb{padding:14px}
+
+/* ── STATS ── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px}
+.stat{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--rs);padding:8px 10px;text-align:center;box-shadow:var(--sh)}
+.sn{font-family:'IBM Plex Mono',monospace;font-size:1.35rem;font-weight:500;line-height:1.1}
+.sn.bl{color:var(--acc)}.sn.gr{color:var(--grn)}.sn.rd{color:var(--red)}.sn.pu{color:var(--pur)}
+.sl{font-size:.62rem;color:var(--t2);margin-top:1px}
+.pbar{height:5px;background:var(--s2);border-radius:3px;overflow:hidden;margin-bottom:10px;display:flex}
+.pg{height:100%;background:var(--grn);transition:width .4s}
+.pr{height:100%;background:var(--red);transition:width .4s}
+.pp{height:100%;background:var(--pur);transition:width .4s}
+
+/* ── STUDENT LIST ── */
+.slist{display:flex;flex-direction:column;gap:2px;max-height:460px;overflow-y:auto;padding-right:2px}
+.slist::-webkit-scrollbar{width:3px}
+.slist::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}
+.si{display:flex;align-items:center;gap:7px;padding:9px 8px;border-radius:var(--rs);
+    border:1.5px solid transparent;transition:all .15s;min-height:44px}
+.si.present{background:var(--gbg);border-color:var(--gbr)}
+.si.absent {background:var(--rbg);border-color:var(--rbr)}
+.si.leave  {background:var(--pbg);border-color:var(--pbr)}
+.si.calling{background:#E8F0FE;border-color:var(--acc);animation:cpulse 1.2s ease-in-out infinite}
+@keyframes cpulse{0%,100%{border-color:var(--acc)}50%{border-color:#AECBFA}}
+.si-no{font-family:'IBM Plex Mono',monospace;font-size:.65rem;color:var(--t3);min-width:22px;text-align:right;flex-shrink:0}
+.si-dot{width:8px;height:8px;border-radius:50%;background:var(--bdr);flex-shrink:0}
+.si.present .si-dot{background:var(--grn);box-shadow:0 0 0 2px var(--gbr)}
+.si.absent  .si-dot{background:var(--red)}
+.si.leave   .si-dot{background:var(--pur)}
+.si.calling .si-dot{background:var(--acc);box-shadow:0 0 0 2px #AECBFA}
+.si-name{flex:1;font-size:.92rem;font-weight:500}
+.badge{font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:12px;flex-shrink:0}
+.bp{background:var(--gbg);color:var(--grn)}.ba{background:var(--rbg);color:var(--red)}.bl2{background:var(--pbg);color:var(--pur)}
+.mbtns{display:flex;gap:3px;flex-shrink:0}
+.mbtns button{border:none;border-radius:5px;font-family:'Sarabun',sans-serif;font-size:.72rem;font-weight:700;
+              padding:5px 8px;cursor:pointer;transition:.15s;min-height:34px}
+.bma{background:var(--gbg);color:var(--grn)}.bma:hover,.bma:active{background:var(--gbr)}
+.bab{background:var(--rbg);color:var(--red)}.bab:hover,.bab:active{background:var(--rbr)}
+.bla{background:var(--pbg);color:var(--pur)}.bla:hover,.bla:active{background:var(--pbr)}
+.empty{text-align:center;padding:28px 12px;color:var(--t3)}
+.empty .ei{font-size:2rem;margin-bottom:8px}
+.empty p{font-size:.82rem;line-height:1.7}
+
+/* ── BUTTONS ── */
+.btn{font-family:'Sarabun',sans-serif;font-size:.83rem;font-weight:600;border:none;border-radius:var(--rs);
+     cursor:pointer;padding:7px 12px;transition:.15s;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.btn-o{background:transparent;border:1.5px solid var(--bdr);color:var(--t2)}.btn-o:hover{border-color:var(--acc);color:var(--acc)}
+.btn-sm{padding:5px 10px;font-size:.76rem;min-height:34px}
+.tbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--bdr)}
+
+/* ── CALL PANEL ── */
+.cpanel{background:var(--s2);border:1px solid var(--bdr);border-radius:var(--r);
+        padding:16px;display:flex;flex-direction:column;gap:12px;margin-bottom:12px}
+
+/* ── DEVICE INFO BANNER ── */
+.dev-info{border-radius:var(--rs);padding:11px 14px;display:flex;gap:10px;align-items:flex-start}
+.dev-info.android{background:linear-gradient(135deg,#e8f0fe,#f0f4ff);border:1.5px solid #AECBFA}
+.dev-info.ios-ok {background:linear-gradient(135deg,#e6f4ea,#f0faf2);border:1.5px solid var(--gbr)}
+.dev-info.ios-no {background:linear-gradient(135deg,#fce8e6,#fff5f5);border:1.5px solid var(--rbr)}
+.dev-info .di-icon{font-size:1.3rem;flex-shrink:0;margin-top:2px}
+.dev-info .di-body{flex:1}
+.dev-info .di-title{font-size:.82rem;font-weight:700;margin-bottom:3px}
+.dev-info.android .di-title,.dev-info.ios-ok .di-title{color:#1558B0}
+.dev-info.ios-no .di-title{color:var(--red)}
+.dev-info .di-desc{font-size:.74rem;line-height:1.65;color:var(--t2)}
+
+/* ── MIC BANNER ── */
+.mic-banner{border-radius:var(--rs);padding:14px 16px}
+.mic-banner.warn{background:linear-gradient(135deg,#fff3cd,#fff8e1);border:1.5px solid #ffc107}
+.mic-banner.err {background:linear-gradient(135deg,#fce8e6,#fff5f5);border:1.5px solid var(--rbr)}
+.mic-banner h3{font-size:.9rem;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.mic-banner.warn h3{color:#7c5c00}
+.mic-banner.err  h3{color:#c62828}
+.mic-steps{display:flex;flex-direction:column;gap:4px}
+.mic-step{background:rgba(255,255,255,.7);border-radius:6px;padding:8px 10px;
+          font-size:.79rem;color:#5c4200;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+.mic-step span{flex-shrink:0;font-size:1rem}
+.btn-mic{font-family:'Sarabun',sans-serif;font-size:.85rem;font-weight:700;background:var(--acc);
+         color:#fff;border:none;border-radius:var(--rs);padding:11px 16px;cursor:pointer;
+         margin-top:10px;width:100%;transition:.15s;min-height:var(--touch)}
+.btn-mic:hover,.btn-mic:active{background:var(--adk)}
+
+/* ── CALLING BOX ── */
+.cbox{background:#fff;border:2px solid var(--bdr);border-radius:var(--r);padding:14px 16px;
+      text-align:center;min-height:90px;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:4px;transition:all .25s}
+.cbox.waiting{border-color:var(--acc);animation:bdpulse 1.2s ease-in-out infinite}
+.cbox.ok  {border-color:var(--grn);background:var(--gbg)}
+.cbox.fail{border-color:var(--red);background:var(--rbg)}
+.cbox.idle{border-color:var(--bdr);background:var(--s2)}
+@keyframes bdpulse{0%,100%{border-color:var(--acc)}50%{border-color:#AECBFA}}
+.clbl{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--t3)}
+.cname{font-size:1.45rem;font-weight:800;color:var(--acc);line-height:1.2}
+.cbox.idle .cname{color:var(--t3);font-size:.95rem;font-weight:400}
+.cheard{font-size:.82rem;color:var(--t2);font-style:italic;min-height:1.2em}
+
+/* KEYWORDS */
+.kws{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;font-size:.72rem}
+.kw{padding:3px 9px;border-radius:12px;font-weight:600;border:1px solid}
+.kwg{background:var(--gbg);color:var(--grn);border-color:var(--gbr)}
+.kwr{background:var(--rbg);color:var(--red);border-color:var(--rbr)}
+.kwp{background:var(--pbg);color:var(--pur);border-color:var(--pbr)}
+
+/* ── WAVE + VOLUME ── */
+.wave-wrap{width:100%;height:52px;background:#fff;border-radius:var(--rs);border:1px solid var(--bdr);
+           display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.wave-idle-txt{color:var(--t3);font-size:.78rem}
+#waveBars{display:none;align-items:center;gap:3px;height:100%;padding:8px 10px}
+.wb{width:4px;background:var(--acc);border-radius:2px;animation:wb 1s ease-in-out infinite;opacity:.75}
+.wb:nth-child(1){animation-delay:0s;height:25%}.wb:nth-child(2){animation-delay:.07s;height:55%}
+.wb:nth-child(3){animation-delay:.14s;height:80%}.wb:nth-child(4){animation-delay:.21s;height:45%}
+.wb:nth-child(5){animation-delay:.28s;height:90%}.wb:nth-child(6){animation-delay:.35s;height:38%}
+.wb:nth-child(7){animation-delay:.42s;height:68%}.wb:nth-child(8){animation-delay:.35s;height:38%}
+.wb:nth-child(9){animation-delay:.28s;height:90%}.wb:nth-child(10){animation-delay:.21s;height:45%}
+.wb:nth-child(11){animation-delay:.14s;height:80%}.wb:nth-child(12){animation-delay:.07s;height:55%}
+.wb:nth-child(13){animation-delay:0s;height:25%}
+@keyframes wb{0%,100%{transform:scaleY(.35);opacity:.5}50%{transform:scaleY(1);opacity:1}}
+#volMeter{position:absolute;bottom:0;left:0;height:3px;background:var(--grn);
+          transition:width .08s;border-radius:0 2px 0 0}
+
+/* MIC PILL */
+.mic-pill{display:inline-flex;align-items:center;gap:5px;font-size:.7rem;font-weight:600;
+          padding:3px 10px;border-radius:20px;border:1px solid;flex-shrink:0}
+.mic-pill.ok     {background:var(--gbg);color:var(--grn);border-color:var(--gbr)}
+.mic-pill.err    {background:var(--rbg);color:var(--red);border-color:var(--rbr)}
+.mic-pill.pending{background:var(--abg);color:var(--amb);border-color:#f6d77e}
+.mic-pill.info   {background:#e8f0fe;color:var(--acc);border-color:#AECBFA}
+.mic-dot{width:6px;height:6px;border-radius:50%;background:currentColor;
+         animation:blink 1.5s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* PROGRESS */
+.cprog{display:none;align-items:center;gap:8px;font-size:.76rem;color:var(--t2)}
+.progbar{flex:1;height:4px;background:var(--bdr);border-radius:2px;overflow:hidden}
+.progfill{height:100%;background:var(--acc);border-radius:2px;transition:width .3s}
+
+/* ── PTT BUTTON ── */
+.ptt-wrap{display:none;flex-direction:column;align-items:center;gap:8px}
+#pttBtn{width:100%;height:82px;border-radius:14px;border:3px solid var(--acc);background:var(--sur);
+        color:var(--acc);font-family:'Sarabun',sans-serif;font-size:1.1rem;font-weight:800;
+        cursor:pointer;transition:all .18s;display:flex;align-items:center;justify-content:center;
+        gap:10px;-webkit-user-select:none;user-select:none;touch-action:none;box-shadow:var(--shm)}
+#pttBtn.pressing{background:var(--acc);color:#fff;transform:scale(.97);
+                 box-shadow:0 0 0 7px rgba(26,115,232,.18)}
+#pttBtn.listening{background:var(--red);border-color:var(--red);color:#fff;
+                  animation:ring 1.2s ease-in-out infinite}
+#pttBtn:disabled{opacity:.35;cursor:not-allowed;transform:none!important;box-shadow:none;animation:none}
+.ptt-hint{font-size:.73rem;color:var(--t2);text-align:center;line-height:1.5}
+
+/* CONTROLS */
+.ctrl{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
+#callBtn{width:76px;height:76px;border-radius:50%;border:none;background:var(--acc);color:#fff;
+         font-size:1.6rem;cursor:pointer;box-shadow:var(--shm);transition:.2s;flex-shrink:0}
+#callBtn:hover:not(:disabled){transform:scale(1.07);background:var(--adk)}
+#callBtn.on{background:var(--red);animation:ring 1.5s ease-in-out infinite}
+#callBtn:disabled{opacity:.35;cursor:not-allowed;transform:none!important}
+@keyframes ring{0%,100%{box-shadow:0 0 0 0 rgba(217,48,37,.35)}50%{box-shadow:0 0 0 14px rgba(217,48,37,0)}}
+.nbtn{border:1.5px solid var(--bdr);background:var(--sur);border-radius:var(--rs);
+      font-family:'Sarabun',sans-serif;font-size:.85rem;font-weight:600;color:var(--t2);
+      padding:10px 14px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:4px;
+      min-height:var(--touch)}
+.nbtn:hover:not(:disabled),.nbtn:active:not(:disabled){border-color:var(--acc);color:var(--acc)}
+.nbtn:disabled{opacity:.35;cursor:not-allowed}
+.nbtn.skip{background:var(--rbg);border-color:var(--rbr);color:var(--red)}
+.nbtn.skip:hover:not(:disabled),.nbtn.skip:active:not(:disabled){background:var(--rbr)}
+#cstatus{font-size:.8rem;color:var(--t2);font-weight:500;text-align:center;min-height:1.2em;transition:color .2s}
+#cstatus.w{color:var(--acc);font-weight:700}
+#cstatus.ok{color:var(--grn);font-weight:700}
+#cstatus.miss{color:var(--red);font-weight:700}
+
+/* CONFIRM ROW */
+.confrow{display:none;flex-direction:column;gap:7px;background:#fff;
+         border:1.5px solid var(--bdr);border-radius:var(--rs);padding:11px 13px}
+.confrow.show{display:flex}
+.conflbl{font-size:.68rem;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.05em}
+.confbtns{display:flex;gap:7px;flex-wrap:wrap}
+.cbtn{flex:1;min-width:80px;border:none;border-radius:var(--rs);font-family:'Sarabun',sans-serif;
+      font-size:1rem;font-weight:700;padding:13px 8px;cursor:pointer;transition:.15s;
+      display:flex;align-items:center;justify-content:center;gap:5px;min-height:var(--touch)}
+.cbtn.present{background:var(--gbg);color:var(--grn);border:2px solid var(--gbr)}.cbtn.present:hover,.cbtn.present:active{background:var(--gbr)}
+.cbtn.absent {background:var(--rbg);color:var(--red);border:2px solid var(--rbr)}.cbtn.absent:hover,.cbtn.absent:active{background:var(--rbr)}
+.cbtn.leave  {background:var(--pbg);color:var(--pur);border:2px solid var(--pbr)}.cbtn.leave:hover,.cbtn.leave:active{background:var(--pbr)}
+
+/* SAVE TAG */
+.stag{font-size:.67rem;color:var(--t3);display:flex;align-items:center;gap:3px}
+.stag.saving{color:var(--amb)}.stag.saved{color:var(--grn)}
+
+/* ── TABS ── */
+.tabs{display:flex;border-bottom:2px solid var(--bdr)}
+.tabbtn{font-family:'Sarabun',sans-serif;font-size:.85rem;font-weight:600;color:var(--t2);
+        background:none;border:none;padding:10px 14px;cursor:pointer;
+        border-bottom:2.5px solid transparent;margin-bottom:-2px;transition:.15s;min-height:44px}
+.tabbtn:hover,.tabbtn:active{color:var(--acc)}
+.tabbtn.active{color:var(--acc);border-bottom-color:var(--acc)}
+.tabp{display:none;padding-top:10px}.tabp.active{display:block}
+
+/* ── TABLE ── */
+.tw{overflow:auto;max-height:260px}
+.tw::-webkit-scrollbar{width:3px;height:3px}
+.tw::-webkit-scrollbar-thumb{background:var(--bdr);border-radius:2px}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+th{position:sticky;top:0;background:var(--s2);font-weight:700;font-size:.65rem;
+   text-transform:uppercase;letter-spacing:.06em;color:var(--t2);
+   padding:7px 8px;border-bottom:2px solid var(--bdr);text-align:left;white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--bdr);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{background:rgba(123,31,162,.04)}
+.tsp{font-weight:700}.tsp.p{color:var(--grn)}.tsp.a{color:var(--red)}.tsp.l{color:var(--pur)}
+.nodata{text-align:center;padding:18px;color:var(--t3);font-size:.8rem}
+
+/* ── HISTORY ── */
+.hcard{background:var(--s2);border:1px solid var(--bdr);border-radius:var(--rs);padding:10px 12px}
+.hsubj{font-size:.78rem;font-weight:700;color:var(--txt);margin-bottom:2px}
+.hdate{font-size:.67rem;color:var(--t2);margin-bottom:5px}
+.hnums{font-family:'IBM Plex Mono',monospace;font-size:.78rem;display:flex;gap:8px}
+.hbar{margin-top:5px;height:3px;background:var(--bdr);border-radius:2px}
+.hfill{height:100%;background:var(--grn);border-radius:2px}
+.hsel{display:flex;gap:6px;align-items:center;margin-bottom:10px}
+.hsel select{font-family:'Sarabun',sans-serif;font-size:.85rem;background:var(--s2);
+             border:1.5px solid var(--bdr);border-radius:var(--rs);color:var(--txt);
+             padding:7px 9px;outline:none;cursor:pointer;flex:1;min-height:42px}
+.hsel select:focus{border-color:var(--acc)}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#323232;
+       color:#fff;font-size:.85rem;padding:10px 18px;border-radius:24px;
+       box-shadow:0 4px 14px rgba(0,0,0,.25);opacity:0;pointer-events:none;
+       transition:opacity .25s;z-index:999;white-space:nowrap;max-width:92vw;text-align:center}
+#toast.show{opacity:1}
+
+/* ── OVERLAY ── */
+#overlay{position:fixed;inset:0;background:rgba(255,255,255,.92);
+         display:flex;flex-direction:column;align-items:center;justify-content:center;
+         gap:10px;z-index:500;text-align:center;padding:20px}
+#overlay.hide{display:none}
+.spin{width:34px;height:34px;border:3px solid var(--bdr);border-top-color:var(--acc);
+      border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lmsg{font-size:.85rem;color:var(--t2)}
+
+/* ── TOUCH TARGETS ── */
+@media(pointer:coarse){
+  .stab{min-height:44px;padding:8px 16px}
+  .rbtn{min-height:44px}
+  .mbtns button{min-height:40px;padding:6px 10px;font-size:.75rem}
+  .si{padding:11px 8px;min-height:50px}
+  .cbtn{padding:15px 8px}
+  #callBtn{width:84px;height:84px;font-size:1.8rem}
+  .nbtn{min-height:56px;padding:12px 16px}
+  .btn-sm{min-height:40px;padding:7px 12px}
+}
+@media(max-width:860px){
+  .bar-date{display:none}
+  .main{gap:12px}
+  .stats{gap:5px}
+  .sn{font-size:1.15rem}
+  .sl{font-size:.6rem}
+  .slist{max-height:none}
+  .cpanel{padding:12px;gap:10px}
+  .cname{font-size:1.25rem}
+}
+</style>
+</head>
+<body>
+
+<!-- Setup warning banner (แสดงเมื่อยังไม่ได้ตั้ง URL) -->
+<div id="setupBanner">
+  <span style="font-size:1.3rem;flex-shrink:0">⚙️</span>
+  <div>
+    <strong>ยังไม่ได้ตั้งค่า Apps Script URL</strong>
+    แก้ไขค่า <code>WEB_APP_URL</code> ในไฟล์ <code>index.html</code> ให้เป็น URL ของ Web App ที่ deploy แล้ว
+    <br>ดูวิธีตั้งค่าใน <code>README.md</code>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="overlay">
+  <div class="spin"></div>
+  <div class="lmsg" id="lmsg">กำลังเชื่อมต่อ Apps Script…</div>
+  <div style="font-size:.75rem;color:var(--t3);margin-top:4px">
+    ถ้าค้างนาน →
+    <button onclick="location.reload()" style="background:var(--acc);color:#fff;border:none;
+      border-radius:4px;padding:4px 10px;cursor:pointer;font-size:.8rem;font-family:'Sarabun',sans-serif">
+      ↺ รีโหลด
+    </button>
+  </div>
+</div>
+
+<div class="bar">
+  <span style="font-size:1.2rem">📢</span>
+  <span class="bar-title">ระบบเรียกชื่อเช็คชื่อ</span>
+  <span class="bar-date" id="todayBadge"></span>
+  <span class="dev-badge" id="devBadge"></span>
+  <a id="sheetLink" href="#" target="_blank">📊 Sheet</a>
+</div>
+
+<div class="sbar">
+  <span class="sbar-lbl">📚 วิชา</span>
+  <div class="stabs" id="stabs"><span style="color:var(--t3);font-size:.8rem">กำลังโหลด…</span></div>
+  <button class="rbtn" onclick="loadSubjects()">↺</button>
+</div>
+
+<div class="main">
+
+  <!-- LEFT -->
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="stats">
+      <div class="stat"><div class="sn bl" id="sT">0</div><div class="sl">ทั้งหมด</div></div>
+      <div class="stat"><div class="sn gr" id="sP">0</div><div class="sl">มา</div></div>
+      <div class="stat"><div class="sn rd" id="sA">0</div><div class="sl">ขาด</div></div>
+      <div class="stat"><div class="sn pu" id="sL">0</div><div class="sl">ลา</div></div>
+    </div>
+    <div class="pbar">
+      <div class="pg" id="pg" style="width:0%"></div>
+      <div class="pr" id="pr" style="width:0%"></div>
+      <div class="pp" id="pp" style="width:0%"></div>
+    </div>
+    <div class="card">
+      <div class="ch">
+        <span>👥</span><span class="cht" id="listTitle">รายชื่อนักเรียน</span>
+        <button class="btn btn-o btn-sm" onclick="reloadStudents()">↺</button>
+      </div>
+      <div class="cb"><div id="slistWrap">
+        <div class="empty"><div class="ei">📚</div><p>เลือกวิชาด้านบน<br>เพื่อโหลดรายชื่อ</p></div>
+      </div></div>
+      <div class="tbar">
+        <button class="btn btn-o btn-sm" onclick="resetToday()">↺ รีเซ็ต</button>
+        <button class="btn btn-o btn-sm" onclick="exportCSV()">⬇ CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="card">
+      <div class="ch">
+        <span>📢</span><span class="cht">เรียกชื่อ</span>
+        <span id="micPill" class="mic-pill pending"><span class="mic-dot"></span> ตรวจสอบ…</span>
+        <span class="stag" id="stag"></span>
+      </div>
+      <div class="cb">
+        <div class="cpanel">
+          <div id="devInfo" style="display:none"></div>
+          <div id="micBanner" style="display:none"></div>
+
+          <div class="cbox idle" id="cbox">
+            <div class="clbl" id="clbl">พร้อมเรียกชื่อ</div>
+            <div class="cname" id="cname">เลือกวิชาและกดปุ่ม ▶</div>
+            <div class="cheard" id="cheard"></div>
+          </div>
+
+          <div class="kws">
+            <span style="font-size:.7rem;color:var(--t2)">พูด:</span>
+            <span class="kw kwg">มาครับ / มาค่ะ</span>
+            <span class="kw kwr">ไม่มา / ขาด</span>
+            <span class="kw kwp">ลาครับ / ลาค่ะ</span>
+          </div>
+
+          <div class="wave-wrap">
+            <span class="wave-idle-txt" id="waveIdle">กดปุ่ม ▶ เพื่อเริ่มฟัง</span>
+            <div id="waveBars">
+              <div class="wb"></div><div class="wb"></div><div class="wb"></div>
+              <div class="wb"></div><div class="wb"></div><div class="wb"></div>
+              <div class="wb"></div><div class="wb"></div><div class="wb"></div>
+              <div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div>
+            </div>
+            <div id="volMeter" style="width:0%"></div>
+          </div>
+
+          <div class="ptt-wrap" id="pttWrap">
+            <button id="pttBtn" disabled>
+              <span id="pttIcon">🎤</span>
+              <span id="pttLabel">กดค้างเพื่อพูด</span>
+            </button>
+            <div class="ptt-hint" id="pttHint">กดปุ่ม ▶ ก่อน แล้วกดค้างขณะนักเรียนพูด</div>
+          </div>
+
+          <div class="cprog" id="cprog">
+            <span id="progTxt" style="font-family:'IBM Plex Mono',monospace;white-space:nowrap">0/0</span>
+            <div class="progbar"><div class="progfill" id="progFill" style="width:0%"></div></div>
+          </div>
+
+          <div id="cstatus">เลือกวิชาก่อนเพื่อเริ่มเรียกชื่อ</div>
+
+          <div class="ctrl">
+            <button class="nbtn" id="prevBtn" onclick="goPrev()" disabled>◀ ก่อนหน้า</button>
+            <button id="callBtn" onclick="toggleCall()" disabled>▶</button>
+            <button class="nbtn skip" id="skipBtn" onclick="goSkip()" disabled>ข้าม ▶</button>
+          </div>
+
+          <div class="confrow" id="confrow">
+            <div class="conflbl">✋ ยืนยันด้วยตนเอง — <span id="confName" style="color:var(--acc);font-weight:700"></span></div>
+            <div class="confbtns">
+              <button class="cbtn present" id="btnPresent">✓ มา</button>
+              <button class="cbtn absent"  id="btnAbsent">✗ ขาด</button>
+              <button class="cbtn leave"   id="btnLeave">🏥 ลา</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="background:var(--s2);border:1px solid var(--bdr);border-radius:var(--rs);
+                    padding:9px 12px;font-size:.76rem;color:var(--t2);display:flex;gap:6px">
+          <span>💡</span><span id="tipText">กด ▶ → เรียกชื่อทีละคน → นักเรียนตอบ → บันทึก Sheet อัตโนมัติ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOG / HISTORY -->
+    <div class="card">
+      <div class="ch" style="padding-bottom:0;border-bottom:none">
+        <div class="tabs" style="width:100%;border-bottom:none">
+          <button class="tabbtn active" onclick="switchTab('log',this)">📋 บันทึกวันนี้</button>
+          <button class="tabbtn" onclick="switchTab('hist',this)">📅 ประวัติ</button>
+        </div>
+      </div>
+      <div class="cb">
+        <div class="tabp active" id="tab-log">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:.76rem;color:var(--t2)" id="logLbl"></span>
+            <button class="btn btn-o btn-sm" onclick="reloadLog()">↺</button>
+          </div>
+          <div class="tw">
+            <table>
+              <thead><tr><th>เวลา</th><th>ชื่อ</th><th>สถานะ</th><th>หมายเหตุ</th></tr></thead>
+              <tbody id="logBody"><tr><td colspan="4" class="nodata">ยังไม่มีบันทึก</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tabp" id="tab-hist">
+          <div class="hsel">
+            <select id="histSel" onchange="loadHistDetail()"><option value="">— เลือก Sheet บันทึก —</option></select>
+            <button class="btn btn-o btn-sm" onclick="loadHistList()">↺</button>
+          </div>
+          <div id="histDetail"><div style="text-align:center;color:var(--t3);font-size:.8rem;padding:16px">เลือก Sheet บันทึกเพื่อดูสรุป</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════
+   ⚙️  ตั้งค่า URL ของ Apps Script Web App ที่นี่
+   1. เปิด script.google.com → Deploy → New deployment → Web App
+   2. Execute as: Me, Who has access: Anyone
+   3. คัดลอก URL มาใส่ด้านล่าง
+════════════════════════════════════════════════════════ */
+const WEB_APP_URL = "YOUR_WEB_APP_URL_HERE";
+// ตัวอย่าง: "https://script.google.com/macros/s/AKfycbz.../exec"
+
+/* ════════════════════════════════════════════════════════
+   API LAYER — fetch ไปยัง Apps Script REST
+   - ใช้ no-cors ไม่ได้ (อ่าน response ไม่ได้) → ใช้ redirect:follow
+   - Apps Script จะ redirect 1 ครั้ง → browser ตาม redirect เอง
+════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════
+   API LAYER
+   Apps Script redirect ไป googleusercontent.com ซึ่งติด CORS
+   แก้โดยส่ง GET ผ่าน CORS proxy (ลอง 2 ตัว fallback อัตโนมัติ)
+   POST ส่งตรงได้เลย — ไม่มี redirect
+════════════════════════════════════════════════════════ */
+// ใช้ corsproxy.io เพียงตัวเดียว — เร็วและเสถียรกว่า allorigins
+async function proxyGet(targetUrl) {
+  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
+const API = {
+  async get(action, params = {}) {
+    const qs = new URLSearchParams({ action, ...params }).toString();
+    return proxyGet(`${WEB_APP_URL}?${qs}`);
+  },
+  async post(body) {
+    // POST ส่งตรงได้เลย — Apps Script ไม่ redirect POST
+    const res = await fetch(WEB_APP_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+};
+
+/* ════════════════════════════════════════════════════════
+   INIT CACHE — โหลด ping + subjects + sheetUrl พร้อมกันใน 1 request
+   แก้ปัญหา cold start ทำให้โหลดช้า
+════════════════════════════════════════════════════════ */
+let _initData = null; // cache ผลจาก init request
+
+async function fetchInit() {
+  const res = await API.get('init');
+  _initData = res;
+  return res;
+}
+
+/* เชื่อม google.script.run interface เพื่อให้โค้ดเดิมทำงานได้โดยไม่ต้องแก้ */
+window.google = {
+  script: {
+    run: {
+      _sh: null, _fh: null,
+      withSuccessHandler(h) { this._sh = h; return this; },
+      withFailureHandler(h) { this._fh = h; return this; },
+      _ok(d)  { if (this._sh) this._sh(d); this._sh = null; this._fh = null; },
+      _err(e) { if (this._fh) this._fh(e); this._sh = null; this._fh = null; },
+
+      // ping ใช้ init cache แทน — ไม่ต้องยิง request แยก
+      ping() {
+        fetchInit()
+          .then(d => this._ok(d))
+          .catch(e => this._err(e));
+      },
+      // getSubjects ดึงจาก cache ที่ init โหลดมาแล้ว
+      getSubjects() {
+        if (_initData && _initData.subjects) {
+          const d = _initData.subjects;
+          setTimeout(() => this._ok(Array.isArray(d) ? d : []), 0);
+        } else {
+          API.get('getSubjects')
+            .then(d => this._ok(Array.isArray(d) ? d : []))
+            .catch(e => this._err(e));
+        }
+      },
+      // getSpreadsheetUrl ดึงจาก cache เช่นกัน
+      getSpreadsheetUrl() {
+        if (_initData && _initData.sheetUrl) {
+          const u = _initData.sheetUrl;
+          setTimeout(() => this._ok(u), 0);
+        } else {
+          API.get('getSpreadsheetUrl')
+            .then(d => this._ok(d))
+            .catch(e => this._err(e));
+        }
+      },
+      getStudentsBySubject(subject) {
+        API.get('getStudentsBySubject', { subject })
+          .then(d => this._ok(d))
+          .catch(e => this._err(e));
+      },
+      getTodayLog(subject) {
+        API.get('getTodayLog', { subject })
+          .then(d => this._ok(Array.isArray(d) ? d : []))
+          .catch(e => this._err(e));
+      },
+      // โหลด students + todayLog พร้อมกันใน 1 request
+      getStudentsAndLog(subject) {
+        API.get('getStudentsAndLog', { subject })
+          .then(d => this._ok(d))
+          .catch(e => this._err(e));
+      },
+      getLogSheets() {
+        API.get('getLogSheets')
+          .then(d => this._ok(Array.isArray(d) ? d : []))
+          .catch(e => this._err(e));
+      },
+      getSummaryBySheet(sheetName) {
+        API.get('getSummaryBySheet', { sheetName })
+          .then(d => this._ok(d))
+          .catch(e => this._err(e));
+      },
+      logAttendance(subject, name, status, note) {
+        API.post({ action: 'logAttendance', subject, name, status, note })
+          .then(d => this._ok(d))
+          .catch(e => this._err(e));
+      },
+      clearTodayLog(subject) {
+        API.post({ action: 'clearTodayLog', subject })
+          .then(d => this._ok(d))
+          .catch(e => this._err(e));
+      }
+    }
+  }
+};
+
+/* ════════════════════════════════════════════════════════
+   DEVICE DETECTION
+════════════════════════════════════════════════════════ */
+const UA        = navigator.userAgent;
+const IS_IOS    = /iPad|iPhone|iPod/.test(UA) ||
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_ANDROID= /Android/.test(UA);
+const IS_TABLET = (IS_IOS || IS_ANDROID) && Math.min(screen.width,screen.height) >= 600;
+const IS_PHONE  = (IS_IOS || IS_ANDROID) && !IS_TABLET;
+const IS_DESKTOP= !IS_IOS && !IS_ANDROID;
+const SRC       = window.SpeechRecognition || window.webkitSpeechRecognition;
+const SR_OK     = !!SRC;
+const PTT_MODE  = IS_TABLET || IS_PHONE;
+
+/* ════════════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════════════ */
+let subjects=[], curSubj=null, students=[], callIdx=0;
+let sessionOn=false, recog=null, listenTmr=null;
+let audioCtx=null, analyser=null, micStream=null;
+let micGranted=false, srStarting=false;
+let pttActive=false;
+
+const KW = {
+  present:['มา','มาครับ','มาค่ะ','มาแล้ว','ครับ','ค่ะ','here','yes','present','ฮะ'],
+  absent: ['ขาด','ไม่มา','ไม่ได้มา','absent','no','ไม่'],
+  leave:  ['ลา','ลาครับ','ลาค่ะ','ป่วย','ไม่สบาย','leave','หยุด'],
+};
+
+/* ════════════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════════════ */
+window.addEventListener('load', () => {
+  // แสดง warning ถ้ายังไม่ได้ตั้ง URL
+  if (WEB_APP_URL === 'YOUR_WEB_APP_URL_HERE') {
+    document.getElementById('setupBanner').classList.add('show');
+    document.getElementById('overlay').classList.add('hide');
+    setStatus('⚙️ กรุณาตั้งค่า WEB_APP_URL ก่อน','miss');
+    return;
+  }
+
+  const n = new Date();
+  document.getElementById('todayBadge').textContent =
+    '📅 ' + String(n.getDate()).padStart(2,'0') + '/' +
+    String(n.getMonth()+1).padStart(2,'0') + '/' + (n.getFullYear()+543);
+
+  const badge = document.getElementById('devBadge');
+  const label = IS_IOS ? (IS_TABLET?'iPad':'iPhone') : IS_ANDROID ? (IS_TABLET?'Android Tablet':'Android') : '';
+  if (label) { badge.textContent = '📱 '+label; badge.style.display = ''; }
+
+  setupDeviceUI();
+
+  let tmr = setTimeout(() => {
+    document.getElementById('overlay').classList.add('hide');
+    setStatus('⏱ เชื่อมต่อช้า — ตรวจสอบ WEB_APP_URL หรือกด รีโหลด','miss');
+  }, 15000);
+
+  google.script.run
+    .withSuccessHandler(() => {
+      clearTimeout(tmr);
+      google.script.run
+        .withSuccessHandler(u => { if(u) document.getElementById('sheetLink').href = u; })
+        .withFailureHandler(()=>{})
+        .getSpreadsheetUrl();
+      loadSubjects();
+    })
+    .withFailureHandler(e => {
+      clearTimeout(tmr);
+      document.getElementById('overlay').classList.add('hide');
+      setStatus('❌ เชื่อมต่อไม่ได้: '+(e.message||'ตรวจสอบ WEB_APP_URL'),'miss');
+    })
+    .ping();
+
+  document.getElementById('btnPresent').addEventListener('click',()=>confirmSt('present'));
+  document.getElementById('btnAbsent').addEventListener('click', ()=>confirmSt('absent'));
+  document.getElementById('btnLeave').addEventListener('click',  ()=>confirmSt('leave'));
+
+  if (PTT_MODE) setupPTT();
+});
+
+/* ════════════════════════════════════════════════════════
+   DEVICE UI
+════════════════════════════════════════════════════════ */
+function setupDeviceUI() {
+  if (!SR_OK) {
+    renderMicBanner('err','❌ เบราว์เซอร์ไม่รองรับการรู้จำเสียง',
+      IS_IOS
+        ? [['✅','ใช้ <strong>Safari</strong> บน iOS 14.5 ขึ้นไป'],
+           ['⚠️','Chrome/Firefox บน iOS ไม่รองรับ SR'],
+           ['👆','หรือกด <strong>มา/ขาด/ลา</strong> ในรายชื่อแทนได้']]
+        : [['✅','ใช้ <strong>Google Chrome</strong> หรือ <strong>Microsoft Edge</strong>'],
+           ['✅','เปิดผ่าน <strong>https://</strong> เท่านั้น']]
+    );
+    setPill('err','❌ ไม่รองรับ Speech');
+    if (IS_IOS) { micGranted=true; }
+    return;
+  }
+  if (IS_ANDROID) {
+    renderDevInfo('android','📱','โหมดแท็บเล็ต / มือถือ Android',
+      'กดปุ่ม ▶ เพื่อเริ่ม แล้ว<strong>กดค้างปุ่ม 🎤</strong>ขณะนักเรียนพูด<br>หรือกด <strong>มา/ขาด/ลา</strong> แทนได้');
+    document.getElementById('pttWrap').style.display = 'flex';
+    document.getElementById('tipText').textContent = 'กด ▶ → กดค้าง 🎤 ขณะนักเรียนพูด → ปล่อย → บันทึกอัตโนมัติ';
+    checkMicPermission();
+    return;
+  }
+  if (IS_IOS) {
+    renderDevInfo('ios-ok','🍎','โหมด iPad / iPhone (Safari)',
+      'กดปุ่ม ▶ เพื่อเริ่ม แล้ว<strong>กดค้างปุ่ม 🎤</strong>ขณะนักเรียนพูด<br>ครั้งแรกจะขอสิทธิ์ไมโครโฟน กด <strong>อนุญาต</strong>');
+    document.getElementById('pttWrap').style.display = 'flex';
+    document.getElementById('tipText').textContent = 'กด ▶ → กดค้าง 🎤 ขณะนักเรียนพูด → ปล่อย → บันทึกอัตโนมัติ';
+    setPill('info','🍎 iOS — กดค้าง PTT');
+    micGranted = true;
+    return;
+  }
+  checkMicPermission();
+}
+
+function renderDevInfo(cls, icon, title, desc) {
+  const el = document.getElementById('devInfo');
+  el.className = 'dev-info ' + cls;
+  el.innerHTML = '<span class="di-icon">'+icon+'</span><div class="di-body"><div class="di-title">'+title+'</div><div class="di-desc">'+desc+'</div></div>';
+  el.style.display = 'flex';
+}
+function renderMicBanner(type, title, steps, btnLabel) {
+  const el = document.getElementById('micBanner');
+  el.className = 'mic-banner ' + (type==='err' ? 'err' : 'warn');
+  const stepsHtml = steps.map(([ico,txt]) =>
+    '<div class="mic-step"><span>'+ico+'</span><span>'+txt+'</span></div>'
+  ).join('');
+  el.innerHTML = '<h3>'+title+'</h3><div class="mic-steps">'+stepsHtml+'</div>'+
+    (btnLabel !== false ? '<button class="btn-mic" onclick="requestMicPermission()">'+
+    (btnLabel || (IS_TABLET||IS_PHONE ? '🎤 แตะเพื่ออนุญาตไมโครโฟน' : '🎤 อนุญาตไมโครโฟน'))+'</button>' : '');
+  el.style.display = '';
+}
+
+/* ════════════════════════════════════════════════════════
+   MIC PERMISSION
+════════════════════════════════════════════════════════ */
+async function checkMicPermission() {
+  try {
+    if (navigator.permissions) {
+      const p = await navigator.permissions.query({ name:'microphone' });
+      if (p.state === 'denied') { denyMic(); return; }
+    }
+  } catch(e) {}
+  await requestMicPermission();
+}
+
+function showMicBanner() {
+  renderMicBanner('warn', '🎤 ต้องอนุญาตไมโครโฟนก่อน',
+    IS_ANDROID
+      ? [['1️⃣','แตะ <strong>อนุญาต</strong> เมื่อ Chrome ถาม'],
+         ['2️⃣','ถ้าไม่มี popup → <strong>การตั้งค่า → แอป → Chrome → สิทธิ์ → ไมโครโฟน → อนุญาต</strong>'],
+         ['3️⃣','แตะปุ่มด้านล่างเพื่อลองใหม่']]
+      : [['1️⃣','คลิก 🔒 หรือ 🎤 ที่แถบ URL ของเบราว์เซอร์'],
+         ['2️⃣','เลือก <strong>ไมโครโฟน → อนุญาต</strong>'],
+         ['3️⃣','กดปุ่มด้านล่างเพื่อลองใหม่']]
+  );
+}
+
+async function requestMicPermission() {
+  setPill('pending','⏳ รอการอนุญาต…');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true, video:false });
+    micStream = stream;
+    await grantMic(stream);
+    toast('✅ อนุญาตไมโครโฟนแล้ว');
+  } catch(e) {
+    if (e.name==='NotAllowedError'||e.name==='PermissionDeniedError') denyMic();
+    else if (e.name==='NotFoundError') { setPill('err','🔇 ไม่พบไมค์'); }
+    else { setPill('err','❌ เปิดไมค์ไม่ได้'); }
+  }
+}
+
+async function grantMic(stream) {
+  micGranted = true;
+  setPill('ok','🎤 ไมค์พร้อม');
+  document.getElementById('micBanner').style.display = 'none';
+  if (!stream) {
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio:true }); micStream = stream; }
+    catch(e) {}
+  }
+  if (stream) startVolumeMeter(stream);
+  if (curSubj && students.length)
+    document.getElementById('callBtn').disabled = false;
+  if (PTT_MODE && sessionOn)
+    document.getElementById('pttBtn').disabled = false;
+}
+
+function denyMic() {
+  micGranted = false;
+  setPill('err','🚫 ไมค์ถูกปฏิเสธ');
+  renderMicBanner('warn','🚫 ไมโครโฟนถูกปฏิเสธ — แก้ได้ง่ายๆ',
+    IS_ANDROID
+      ? [['1️⃣','เปิด <strong>การตั้งค่า → แอป → Chrome → สิทธิ์ → ไมโครโฟน → อนุญาต</strong>'],
+         ['2️⃣','กลับมาที่หน้านี้แล้วแตะปุ่มด้านล่าง']]
+      : [['1️⃣','คลิก 🔒 ที่แถบ URL ด้านบน'],
+         ['2️⃣','คลิก <strong>ไมโครโฟน</strong> แล้วเปลี่ยนเป็น <strong>อนุญาต</strong>'],
+         ['3️⃣','กดปุ่มด้านล่างเพื่อลองใหม่']],
+    '🎤 ลองขอสิทธิ์อีกครั้ง'
+  );
+}
+
+function setPill(state,text){
+  const el=document.getElementById('micPill');
+  el.className='mic-pill '+state;
+  el.innerHTML=(state==='pending'?'<span class="mic-dot"></span> ':'')+text;
+}
+
+/* ════════════════════════════════════════════════════════
+   VOLUME METER
+════════════════════════════════════════════════════════ */
+function startVolumeMeter(stream) {
+  try {
+    if (audioCtx) { try{audioCtx.close();}catch(e){} }
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
+    audioCtx.createMediaStreamSource(stream).connect(analyser);
+    (function tick(){
+      requestAnimationFrame(tick);
+      if (!analyser) return;
+      const d = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(d);
+      const avg = d.reduce((s,v)=>s+v,0)/d.length;
+      const m = document.getElementById('volMeter');
+      if (m) m.style.width = (sessionOn||pttActive) ? Math.min(100,(avg/128)*250)+'%' : '0%';
+    })();
+  } catch(e) {}
+}
+
+/* ════════════════════════════════════════════════════════
+   PTT SETUP
+════════════════════════════════════════════════════════ */
+function setupPTT() {
+  const btn = document.getElementById('pttBtn');
+  let pttDebounce = null;
+  function onStart(e) { e.preventDefault(); clearTimeout(pttDebounce); startPTT(); }
+  function onEnd(e)   { e.preventDefault(); pttDebounce = setTimeout(stopPTT, 120); }
+  btn.addEventListener('touchstart', onStart, { passive:false });
+  btn.addEventListener('touchend',   onEnd,   { passive:false });
+  btn.addEventListener('touchcancel',onEnd,   { passive:false });
+  btn.addEventListener('mousedown',  onStart);
+  btn.addEventListener('mouseup',    onEnd);
+  btn.addEventListener('mouseleave', ()=>{ if(pttActive) stopPTT(); });
+}
+
+function startPTT() {
+  if (!sessionOn) return;
+  if (callIdx<0||callIdx>=students.length) return;
+  if (students[callIdx]._st !== 'pending') return;
+  if (pttActive) return;
+  if (!micGranted && !IS_IOS) { showMicBanner(); requestMicPermission(); return; }
+  pttActive = true;
+  const btn = document.getElementById('pttBtn');
+  btn.classList.add('pressing','listening');
+  document.getElementById('pttIcon').textContent  = '🔴';
+  document.getElementById('pttLabel').textContent = 'กำลังฟัง…';
+  document.getElementById('pttHint').textContent  = 'ปล่อยนิ้วเมื่อนักเรียนพูดเสร็จ';
+  document.getElementById('cheard').textContent   = '🎤 กำลังฟัง…';
+  document.getElementById('waveIdle').style.display = 'none';
+  document.getElementById('waveBars').style.display = 'flex';
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  clearTimer(); startRecog();
+}
+
+function stopPTT() {
+  if (!pttActive) return;
+  pttActive = false;
+  const btn = document.getElementById('pttBtn');
+  btn.classList.remove('pressing','listening');
+  document.getElementById('pttIcon').textContent  = '🎤';
+  document.getElementById('pttLabel').textContent = 'กดค้างเพื่อพูด';
+  document.getElementById('pttHint').textContent  = 'กดปุ่ม ▶ ก่อน แล้วกดค้างขณะนักเรียนพูด';
+  if (recog) {
+    try { recog.stop(); } catch(e) {}
+    setTimeout(() => {
+      if (recog && pttActive===false) { try{recog.abort();}catch(e){} recog=null; }
+      document.getElementById('waveBars').style.display = 'none';
+      document.getElementById('waveIdle').style.display = '';
+    }, 2000);
+  } else {
+    document.getElementById('waveBars').style.display = 'none';
+    document.getElementById('waveIdle').style.display = '';
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   SUBJECTS
+════════════════════════════════════════════════════════ */
+function loadSubjects() {
+  setLoad(true,'กำลังโหลดรายวิชา…');
+  google.script.run
+    .withSuccessHandler(d=>{ subjects=d||[]; renderStabs(); setLoad(false); if(curSubj)reloadStudents(); })
+    .withFailureHandler(()=>{ setLoad(false); toast('โหลดวิชาไม่ได้'); })
+    .getSubjects();
+}
+function renderStabs() {
+  const w=document.getElementById('stabs');
+  if(!subjects.length){w.innerHTML='<span style="color:var(--amb);font-size:.8rem">⚠️ ไม่พบ Sheet วิชา</span>';return;}
+  w.innerHTML='';
+  subjects.forEach(s=>{
+    const b=document.createElement('button'); b.className='stab'+(s.name===curSubj?' active':'');
+    b.textContent=s.name; b.addEventListener('click',()=>selSubj(s.name)); w.appendChild(b);
+  });
+}
+function selSubj(name) {
+  if(curSubj===name&&students.length)return;
+  if(sessionOn)stopSession();
+  curSubj=name; students=[]; callIdx=0;
+  renderList(); updateStats(); clearCbox(); renderStabs();
+  document.getElementById('listTitle').textContent=name;
+  document.getElementById('logLbl').textContent='วิชา: '+name;
+  document.getElementById('cprog').style.display='none';
+  setStatus('กำลังโหลดรายชื่อ…','');
+  setLoad(true,'กำลังโหลด '+name+'…');
+  // โหลด students + todayLog พร้อมกันใน 1 request เดียว (เร็วกว่าเดิม ~2x)
+  API.get('getStudentsAndLog', { subject: name })
+    .then(res => {
+      if(res.error){ setLoad(false); toast(res.error); return; }
+      students = (res.students||[]).map(s=>({...s,_st:'pending'}));
+      applyLog(res.logs||[]);
+    })
+    .catch(()=>{ setLoad(false); toast('โหลดรายชื่อไม่ได้'); });
+}
+function reloadStudents(){ if(curSubj) selSubj(curSubj); }
+
+function applyLog(logs) {
+  logs.forEach(r=>{
+    const s=students.find(x=>x.name===r.name);
+    if(s&&s._st==='pending')
+      s._st=r.status.includes('มา')?'present':r.status.includes('ลา')?'leave':'absent';
+  });
+  let fi=students.findIndex(s=>s._st==='pending'); callIdx=fi>=0?fi:0;
+  renderList(); updateStats(); setLoad(false);
+  const canCall=SR_OK&&micGranted||(IS_IOS&&SR_OK);
+  document.getElementById('callBtn').disabled=!students.length||!canCall;
+  setStatus(!SR_OK?'❌ ใช้ Chrome หรือ Safari เท่านั้น':
+            (!micGranted&&!IS_IOS)?'🎤 กรุณาอนุญาตไมค์ก่อน':'กดปุ่ม ▶ เพื่อเริ่มเรียกชื่อ',
+            !SR_OK||(!micGranted&&!IS_IOS)?'miss':'');
+}
+
+function syncLog(){
+  // ใช้สำหรับ refresh log หลังบันทึกเท่านั้น (ไม่ใช่ตอนโหลดวิชา)
+  google.script.run
+    .withSuccessHandler(logs=>{ applyLog(logs||[]); })
+    .withFailureHandler(()=>{})
+    .getTodayLog(curSubj);
+}
+
+/* ════════════════════════════════════════════════════════
+   RENDER LIST
+════════════════════════════════════════════════════════ */
+function renderList(){
+  const w=document.getElementById('slistWrap');
+  if(!curSubj){w.innerHTML='<div class="empty"><div class="ei">📚</div><p>เลือกวิชาด้านบน</p></div>';return;}
+  if(!students.length){w.innerHTML='<div class="empty"><div class="ei">👥</div><p>ไม่พบรายชื่อ</p></div>';return;}
+  const el=document.createElement('div'); el.className='slist';
+  students.forEach(s=>{
+    const st=s._st||'pending', calling=sessionOn&&students[callIdx]&&students[callIdx].name===s.name;
+    const row=document.createElement('div');
+    row.className='si '+(calling?'calling':st==='present'?'present':st==='absent'?'absent':st==='leave'?'leave':'');
+    row.id='si'+s.no;
+    const right=st==='present'?'<span class="badge bp">✓ มา</span>':
+                st==='absent' ?'<span class="badge ba">✗ ขาด</span>':
+                st==='leave'  ?'<span class="badge bl2">🏥 ลา</span>':
+      '<div class="mbtns"><button data-st="present">มา</button><button data-st="absent">ขาด</button><button data-st="leave">ลา</button></div>';
+    row.innerHTML='<span class="si-no">'+String(s.no).padStart(2,'0')+'</span>'+
+      '<span class="si-dot"></span><span class="si-name">'+esc(s.name)+'</span>'+right;
+    row.querySelectorAll('[data-st]').forEach(btn=>{
+      btn.className=btn.dataset.st==='present'?'bma':btn.dataset.st==='absent'?'bab':'bla';
+      btn.addEventListener('click',()=>manualMark(s.name,btn.dataset.st));
+    });
+    el.appendChild(row);
+  });
+  w.innerHTML=''; w.appendChild(el);
+}
+function updateStats(){
+  const t=students.length,p=students.filter(s=>s._st==='present').length,
+        a=students.filter(s=>s._st==='absent').length,l=students.filter(s=>s._st==='leave').length;
+  ['sT','sP','sA','sL'].forEach((id,i)=>document.getElementById(id).textContent=[t,p,a,l][i]);
+  document.getElementById('pg').style.width=(t?p/t*100:0)+'%';
+  document.getElementById('pr').style.width=(t?a/t*100:0)+'%';
+  document.getElementById('pp').style.width=(t?l/t*100:0)+'%';
+}
+function manualMark(name,st){
+  const s=students.find(x=>x.name===name);if(!s)return;
+  s._st=st; renderList(); updateStats(); saveRecord(name,st,'(กดเอง)');
+  if(sessionOn&&students[callIdx]&&students[callIdx].name===name) setTimeout(goNext,700);
+}
+
+/* ════════════════════════════════════════════════════════
+   SESSION
+════════════════════════════════════════════════════════ */
+async function toggleCall(){
+  if(!curSubj){toast('เลือกวิชาก่อน');return;}
+  if(!students.length){toast('ไม่พบรายชื่อ');return;}
+  if(!SR_OK){toast('❌ กรุณาใช้ Chrome หรือ Safari');return;}
+  if(sessionOn){stopSession();return;}
+  if(!micGranted && !IS_IOS){
+    await requestMicPermission();
+    if(!micGranted) return;
+  }
+  startSession();
+}
+function startSession(){
+  sessionOn=true;
+  if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+  const btn=document.getElementById('callBtn'); btn.classList.add('on'); btn.textContent='⏹';
+  document.getElementById('skipBtn').disabled=false;
+  document.getElementById('prevBtn').disabled=false;
+  document.getElementById('cprog').style.display='flex';
+  if(PTT_MODE) document.getElementById('pttBtn').disabled=false;
+  if(IS_DESKTOP){
+    document.getElementById('waveIdle').style.display='none';
+    document.getElementById('waveBars').style.display='flex';
+  }
+  let fi=students.findIndex(s=>s._st==='pending'); if(fi>=0)callIdx=fi;
+  callStudent(callIdx);
+}
+function stopSession(){
+  sessionOn=false; clearTimer(); stopRecog();
+  const btn=document.getElementById('callBtn'); btn.classList.remove('on'); btn.textContent='▶';
+  document.getElementById('skipBtn').disabled=true;
+  document.getElementById('prevBtn').disabled=true;
+  document.getElementById('confrow').classList.remove('show');
+  document.getElementById('pttBtn').disabled=true;
+  document.getElementById('waveIdle').style.display='';
+  document.getElementById('waveBars').style.display='none';
+  document.getElementById('volMeter').style.width='0%';
+  document.getElementById('pttIcon').textContent='🎤';
+  document.getElementById('pttLabel').textContent='กดค้างเพื่อพูด';
+  setStatus('หยุดแล้ว — กด ▶ เพื่อเรียกชื่อต่อ',''); clearCbox();
+}
+function callStudent(idx){
+  if(!sessionOn)return;
+  if(idx<0||idx>=students.length){finishSession();return;}
+  callIdx=idx; const s=students[idx];
+  document.getElementById('cbox').className='cbox waiting';
+  document.getElementById('clbl').textContent='กำลังเรียก ('+s.no+'/'+students.length+')';
+  document.getElementById('cname').textContent=s.name;
+  document.getElementById('cheard').textContent=PTT_MODE?'กดค้างปุ่ม 🎤 ขณะนักเรียนพูด':'รอการตอบ…';
+  const done=students.filter(x=>x._st!=='pending').length;
+  document.getElementById('progTxt').textContent=done+'/'+students.length;
+  document.getElementById('progFill').style.width=(done/students.length*100)+'%';
+  setStatus('🔊 เรียก "'+s.name+'" — '+(PTT_MODE?'กดค้าง 🎤 เพื่อฟัง':'รอการตอบ'),'w');
+  document.getElementById('confrow').classList.add('show');
+  document.getElementById('confName').textContent=s.name;
+  renderList();
+  const el=document.getElementById('si'+s.no); if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
+  if(IS_DESKTOP&&SR_OK){ startRecog(); clearTimer();
+    listenTmr=setTimeout(()=>{
+      if(!sessionOn)return;
+      const cur=students[callIdx];
+      if(cur&&cur._st==='pending'){
+        document.getElementById('cbox').className='cbox fail';
+        document.getElementById('cheard').textContent='⏱ หมดเวลา — กด "ข้าม" หรือยืนยัน';
+        setStatus('ไม่มีการตอบ — กด "ข้าม" หรือยืนยัน','miss');
+      }
+    },8000);
+  }
+}
+function goNext(){clearTimer();stopRecog();callStudent(callIdx+1);}
+function goPrev(){if(!sessionOn)return;clearTimer();stopRecog();callStudent(Math.max(0,callIdx-1));}
+function goSkip(){
+  if(!sessionOn||callIdx<0)return;
+  const s=students[callIdx]; s._st='absent'; renderList(); updateStats();
+  saveRecord(s.name,'absent','(ข้าม)'); toast('⏭ ข้าม — '+s.name+' นับว่าขาด'); goNext();
+}
+function confirmSt(status){
+  if(callIdx<0||callIdx>=students.length)return;
+  const s=students[callIdx]; s._st=status; renderList(); updateStats();
+  saveRecord(s.name,status,'(ยืนยันเอง)');
+  const lbl=status==='present'?'✓ มา':status==='leave'?'🏥 ลา':'✗ ขาด';
+  toast(lbl+' — '+s.name);
+  document.getElementById('cbox').className='cbox ok';
+  document.getElementById('cheard').textContent=lbl+' (ยืนยันเอง)';
+  setStatus(lbl+' — '+s.name,'ok'); clearTimer(); stopRecog(); setTimeout(goNext,800);
+}
+function finishSession(){
+  sessionOn=false; stopRecog(); clearTimer();
+  const btn=document.getElementById('callBtn'); btn.classList.remove('on'); btn.textContent='✔';
+  ['skipBtn','prevBtn'].forEach(id=>document.getElementById(id).disabled=true);
+  document.getElementById('pttBtn').disabled=true;
+  document.getElementById('confrow').classList.remove('show');
+  document.getElementById('waveIdle').style.display='';
+  document.getElementById('waveBars').style.display='none';
+  document.getElementById('volMeter').style.width='0%';
+  document.getElementById('cbox').className='cbox ok';
+  document.getElementById('clbl').textContent='เรียกชื่อครบแล้ว';
+  document.getElementById('cname').textContent='✅ เสร็จสิ้น';
+  document.getElementById('cheard').textContent='';
+  document.getElementById('progFill').style.width='100%';
+  document.getElementById('progTxt').textContent=students.length+'/'+students.length;
+  setStatus('เช็คชื่อเสร็จสิ้น','ok'); toast('✅ เรียกชื่อครบทุกคนแล้ว!'); reloadLog();
+}
+function clearCbox(){
+  document.getElementById('cbox').className='cbox idle';
+  document.getElementById('clbl').textContent='พร้อมเรียกชื่อ';
+  document.getElementById('cname').textContent='เลือกวิชาและกดปุ่ม ▶';
+  document.getElementById('cheard').textContent='';
+  document.getElementById('confrow').classList.remove('show');
+}
+function setStatus(msg,cls){const el=document.getElementById('cstatus');el.textContent=msg;el.className=cls||'';}
+
+/* ════════════════════════════════════════════════════════
+   SPEECH RECOGNITION
+════════════════════════════════════════════════════════ */
+function startRecog(){
+  if(!SR_OK) return;
+  if(!micGranted&&!IS_IOS) return;
+  if(srStarting) return;
+  if(recog){ try{recog.abort();}catch(e){} recog=null; }
+  srStarting = true;
+  recog = new SRC();
+  recog.lang = 'th-TH';
+  recog.continuous = false;
+  recog.interimResults = true;
+  recog.maxAlternatives = 5;
+  recog.onstart = () => { srStarting = false; };
+  recog.onresult = e => {
+    const txts=[];
+    for(let i=0;i<e.results.length;i++)
+      for(let j=0;j<e.results[i].length;j++){const t=e.results[i][j].transcript.trim();if(t)txts.push(t);}
+    if(txts[0]) document.getElementById('cheard').textContent='ได้ยิน: "'+txts[0]+'"';
+    if(e.results[0]&&e.results[0].isFinal&&txts.length) processResponse(txts);
+  };
+  recog.onerror = e => {
+    srStarting = false; recog = null;
+    if(e.error==='no-speech'){
+      if(IS_DESKTOP && sessionOn && micGranted) setTimeout(startRecog, 400);
+      return;
+    }
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      micGranted=false; setPill('err','🚫 ไมค์ถูกปฏิเสธ'); denyMic(); stopSession(); return;
+    }
+    if(e.error==='audio-capture'){
+      micGranted=false; setPill('err','🔇 ไม่พบไมค์'); showMicBanner(); stopSession(); return;
+    }
+    if(e.error==='network'){
+      toast('⚠️ ตรวจสอบอินเทอร์เน็ต');
+      if(IS_DESKTOP && sessionOn && micGranted) setTimeout(startRecog, 2000);
+      return;
+    }
+    if(e.error==='aborted') return;
+    if(IS_DESKTOP && sessionOn && micGranted) setTimeout(startRecog, 600);
+  };
+  recog.onend = () => {
+    srStarting = false;
+    if(IS_DESKTOP && sessionOn && micGranted && students[callIdx] && students[callIdx]._st==='pending')
+      setTimeout(()=>{ if(!srStarting && micGranted) startRecog(); }, 250);
+    if(PTT_MODE && !pttActive){
+      document.getElementById('waveBars').style.display='none';
+      document.getElementById('waveIdle').style.display='';
+    }
+  };
+  if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
+  try { recog.start(); }
+  catch(e) {
+    srStarting=false; recog=null;
+    if(IS_DESKTOP&&sessionOn) setTimeout(startRecog,500);
+  }
+}
+function stopRecog(){
+  srStarting=false;
+  if(recog){try{recog.abort();}catch(e){}recog=null;}
+}
+function clearTimer(){if(listenTmr){clearTimeout(listenTmr);listenTmr=null;}}
+
+/* ════════════════════════════════════════════════════════
+   PROCESS RESPONSE
+════════════════════════════════════════════════════════ */
+function processResponse(txts){
+  if(!sessionOn||callIdx<0||callIdx>=students.length)return;
+  const s=students[callIdx]; if(s._st!=='pending')return;
+  for(const t of txts){
+    const h=t.toLowerCase().trim();
+    let matched=null;
+    if(KW.leave.some(k=>h.includes(k)))   matched='leave';
+    else if(KW.absent.some(k=>h.includes(k)))  matched='absent';
+    else if(KW.present.some(k=>h.includes(k))) matched='present';
+    if(matched){
+      clearTimer(); stopRecog(); pttActive=false;
+      s._st=matched; renderList(); updateStats(); saveRecord(s.name,matched,t);
+      const lbl=matched==='present'?'✓ มา':matched==='leave'?'🏥 ลา':'✗ ขาด';
+      document.getElementById('cbox').className='cbox ok';
+      document.getElementById('cheard').textContent=lbl+' — ได้ยิน: "'+t+'"';
+      setStatus(lbl+' — '+s.name,'ok'); toast(lbl+' — '+s.name);
+      const pb=document.getElementById('pttBtn');
+      pb.classList.remove('pressing','listening');
+      document.getElementById('pttIcon').textContent='🎤';
+      document.getElementById('pttLabel').textContent='กดค้างเพื่อพูด';
+      document.getElementById('waveBars').style.display='none';
+      document.getElementById('waveIdle').style.display='';
+      setTimeout(goNext,1000); return;
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   SAVE / LOG / HISTORY / RESET / EXPORT / TABS
+════════════════════════════════════════════════════════ */
+function saveRecord(name,status,note){
+  if(!curSubj)return; setSave('saving');
+  google.script.run
+    .withSuccessHandler(()=>{setSave('saved');setTimeout(()=>setSave(''),2500);reloadLog();})
+    .withFailureHandler(()=>{setSave('');toast('บันทึกไม่สำเร็จ');})
+    .logAttendance(curSubj,name,status,note||'');
+}
+function setSave(s){const el=document.getElementById('stag');el.className='stag '+s;
+  el.textContent=s==='saving'?'⏳ บันทึก…':s==='saved'?'✅ บันทึกแล้ว':'';}
+function reloadLog(){
+  if(!curSubj)return;
+  google.script.run.withSuccessHandler(d=>renderLog(d||[])).withFailureHandler(()=>{}).getTodayLog(curSubj);
+}
+function renderLog(rows){
+  const tb=document.getElementById('logBody');
+  if(!rows.length){tb.innerHTML='<tr><td colspan="4" class="nodata">ยังไม่มีบันทึกวันนี้</td></tr>';return;}
+  tb.innerHTML=rows.map(r=>{
+    const p=r.status.includes('มา'),l=r.status.includes('ลา');
+    return'<tr class="'+(p?'rp':l?'rl':'ra')+'"><td>'+r.time+'</td><td><strong>'+esc(r.name)+'</strong></td>'+
+      '<td class="tsp '+(p?'p':l?'l':'a')+'">'+r.status+'</td><td>'+esc(r.note||'—')+'</td></tr>';
+  }).join('');
+}
+function loadHistList(){
+  google.script.run.withSuccessHandler(names=>{
+    const sel=document.getElementById('histSel');
+    sel.innerHTML='<option value="">— เลือก Sheet บันทึก —</option>';
+    (names||[]).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n.replace('[บันทึก] ','');sel.appendChild(o);});
+  }).withFailureHandler(()=>{}).getLogSheets();
+}
+function loadHistDetail(){
+  const val=document.getElementById('histSel').value; if(!val)return;
+  google.script.run.withSuccessHandler(d=>renderHistDetail(d)).withFailureHandler(()=>{}).getSummaryBySheet(val);
+}
+function renderHistDetail(d){
+  const wrap=document.getElementById('histDetail');
+  if(!d||!d.rows.length){wrap.innerHTML='<div style="text-align:center;color:var(--t3);font-size:.8rem;padding:16px">ไม่มีข้อมูล</div>';return;}
+  const p=d.rows.filter(r=>r.status.includes('มา')).length,l=d.rows.filter(r=>r.status.includes('ลา')).length,a=d.rows.length-p-l;
+  const pct=d.rows.length?Math.round(p/d.rows.length*100):0;
+  wrap.innerHTML='<div class="hcard" style="margin-bottom:10px">'+
+    '<div class="hsubj">'+esc(d.subject)+'</div><div class="hdate">📅 '+esc(d.date)+'</div>'+
+    '<div class="hnums"><span style="color:var(--grn)">✓'+p+'</span><span style="color:var(--red)">✗'+a+'</span>'+
+    '<span style="color:var(--pur)">🏥'+l+'</span><span style="color:var(--acc)">'+pct+'%</span></div>'+
+    '<div class="hbar"><div class="hfill" style="width:'+pct+'%"></div></div></div>'+
+    '<div class="tw"><table><thead><tr><th>ชื่อ</th><th>สถานะ</th></tr></thead><tbody>'+
+    d.rows.map(r=>{const ip=r.status.includes('มา'),il=r.status.includes('ลา');
+      return'<tr class="'+(ip?'rp':il?'rl':'ra')+'"><td>'+esc(r.name)+'</td>'+
+        '<td class="tsp '+(ip?'p':il?'l':'a')+'">'+(ip?'✓ มา':il?'🏥 ลา':'✗ ขาด')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+}
+function resetToday(){
+  if(!curSubj){toast('เลือกวิชาก่อน');return;}
+  if(!confirm('รีเซ็ตบันทึกวันนี้ของวิชา "'+curSubj+'"?'))return;
+  if(sessionOn)stopSession();
+  students.forEach(s=>s._st='pending'); callIdx=students.findIndex(s=>s._st==='pending'); if(callIdx<0)callIdx=0;
+  renderList();updateStats();clearCbox();
+  google.script.run.withSuccessHandler(()=>{toast('รีเซ็ตสำเร็จ');reloadLog();}).withFailureHandler(()=>toast('เกิดข้อผิดพลาด')).clearTodayLog(curSubj);
+}
+function exportCSV(){
+  if(!students.length){toast('ไม่มีข้อมูล');return;}
+  const rows=[['ลำดับ','ชื่อ-นามสกุล','สถานะ']];
+  students.forEach((s,i)=>rows.push([i+1,s.name,s._st==='present'?'มา':s._st==='absent'?'ขาด':s._st==='leave'?'ลา':'ยังไม่เช็ค']));
+  const csv='\uFEFF'+rows.map(r=>r.map(c=>'"'+c+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download='เช็คชื่อ_'+curSubj+'_'+new Date().toLocaleDateString('th-TH')+'.csv';a.click();
+}
+function switchTab(name,btn){
+  document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tabp').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active'); document.getElementById('tab-'+name).classList.add('active');
+  if(name==='hist')loadHistList(); if(name==='log')reloadLog();
+}
+
+/* ════════════════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════════════════ */
+let toastT;
+function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('show'),2800);}
+function setLoad(on,msg){document.getElementById('lmsg').textContent=msg||'กำลังโหลด…';document.getElementById('overlay').classList.toggle('hide',!on);}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+</script>
+</body>
+</html>
