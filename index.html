@@ -514,7 +514,7 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
    2. Execute as: Me, Who has access: Anyone
    3. คัดลอก URL มาใส่ด้านล่าง
 ════════════════════════════════════════════════════════ */
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9m6VzGYBbuvjRCNwbzofB5WrbQkymMvzmK-GjGKF0J2Sn8mdu4W-l5nQR3A1o6Io/exec";
+const WEB_APP_URL = "1TO3e2aiNPL8CgasbPTAJyzIrzGw3DyuueoI3RJvIDno";
 // ตัวอย่าง: "https://script.google.com/macros/s/AKfycbz.../exec"
 
 /* ════════════════════════════════════════════════════════
@@ -717,21 +717,23 @@ window.addEventListener('load', () => {
     setStatus('⏱ เชื่อมต่อช้า — ตรวจสอบ WEB_APP_URL หรือกด รีโหลด','miss');
   }, 15000);
 
-  google.script.run
-    .withSuccessHandler(() => {
+  // fetchInit โหลด ping + subjects + sheetUrl ใน request เดียว
+  fetchInit()
+    .then(data => {
       clearTimeout(tmr);
-      google.script.run
-        .withSuccessHandler(u => { if(u) document.getElementById('sheetLink').href = u; })
-        .withFailureHandler(()=>{})
-        .getSpreadsheetUrl();
-      loadSubjects();
+      // ตั้ง sheet link จาก cache
+      if (data.sheetUrl) document.getElementById('sheetLink').href = data.sheetUrl;
+      // โหลดวิชาจาก cache ทันที ไม่ต้อง request ใหม่
+      subjects = data.subjects || [];
+      renderStabs();
+      setLoad(false);
+      document.getElementById('overlay').classList.add('hide');
     })
-    .withFailureHandler(e => {
+    .catch(e => {
       clearTimeout(tmr);
       document.getElementById('overlay').classList.add('hide');
       setStatus('❌ เชื่อมต่อไม่ได้: '+(e.message||'ตรวจสอบ WEB_APP_URL'),'miss');
-    })
-    .ping();
+    });
 
   document.getElementById('btnPresent').addEventListener('click',()=>confirmSt('present'));
   document.getElementById('btnAbsent').addEventListener('click', ()=>confirmSt('absent'));
