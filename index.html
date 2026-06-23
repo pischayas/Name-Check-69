@@ -514,7 +514,7 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
    2. Execute as: Me, Who has access: Anyone
    3. คัดลอก URL มาใส่ด้านล่าง
 ════════════════════════════════════════════════════════ */
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9m6VzGYBbuvjRCNwbzofB5WrbQkymMvzmK-GjGKF0J2Sn8mdu4W-l5nQR3A1o6Io/exec";
+const WEB_APP_URL = "YOUR_WEB_APP_URL_HERE";
 // ตัวอย่าง: "https://script.google.com/macros/s/AKfycbz.../exec"
 
 /* ════════════════════════════════════════════════════════
@@ -712,26 +712,20 @@ window.addEventListener('load', () => {
 
   setupDeviceUI();
 
-  let tmr = setTimeout(() => {
-    document.getElementById('overlay').classList.add('hide');
-    setStatus('⏱ เชื่อมต่อช้า — ตรวจสอบ WEB_APP_URL หรือกด รีโหลด','miss');
-  }, 15000);
+  // ซ่อน overlay ทันที แล้วแสดง loading ใน status แทน
+  document.getElementById('overlay').classList.add('hide');
+  setStatus('⏳ กำลังโหลดรายวิชา…','w');
+  document.getElementById('stabs').innerHTML = '<span style="color:var(--t3);font-size:.8rem">⏳ กำลังโหลด…</span>';
 
-  // fetchInit โหลด ping + subjects + sheetUrl ใน request เดียว
   fetchInit()
     .then(data => {
-      clearTimeout(tmr);
-      // ตั้ง sheet link จาก cache
       if (data.sheetUrl) document.getElementById('sheetLink').href = data.sheetUrl;
-      // โหลดวิชาจาก cache ทันที ไม่ต้อง request ใหม่
       subjects = data.subjects || [];
       renderStabs();
-      setLoad(false);
-      document.getElementById('overlay').classList.add('hide');
+      setStatus(subjects.length ? 'เลือกวิชาเพื่อเริ่มเรียกชื่อ' : '⚠️ ไม่พบ Sheet วิชา','');
     })
     .catch(e => {
-      clearTimeout(tmr);
-      document.getElementById('overlay').classList.add('hide');
+      document.getElementById('stabs').innerHTML = '<span style="color:var(--red);font-size:.8rem">❌ โหลดไม่ได้</span>';
       setStatus('❌ เชื่อมต่อไม่ได้: '+(e.message||'ตรวจสอบ WEB_APP_URL'),'miss');
     });
 
@@ -1025,16 +1019,42 @@ function renderList(){
     const row=document.createElement('div');
     row.className='si '+(calling?'calling':st==='present'?'present':st==='absent'?'absent':st==='leave'?'leave':'');
     row.id='si'+s.no;
-    const right=st==='present'?'<span class="badge bp">✓ มา</span>':
-                st==='absent' ?'<span class="badge ba">✗ ขาด</span>':
-                st==='leave'  ?'<span class="badge bl2">🏥 ลา</span>':
-      '<div class="mbtns"><button data-st="present">มา</button><button data-st="absent">ขาด</button><button data-st="leave">ลา</button></div>';
+    // ทุกสถานะกดเปลี่ยนได้ — แสดงปุ่มสถานะอื่นเมื่อกด badge
+    let right;
+    if(st==='pending'){
+      right='<div class="mbtns"><button data-st="present">มา</button><button data-st="absent">ขาด</button><button data-st="leave">ลา</button></div>';
+    } else {
+      const cur=st==='present'?'<span class="badge bp">✓ มา ✎</span>':st==='absent'?'<span class="badge ba">✗ ขาด ✎</span>':'<span class="badge bl2">🏥 ลา ✎</span>';
+      right='<div class="edit-wrap" style="display:flex;gap:4px;align-items:center">'+cur+
+        '<div class="mbtns edit-btns" style="display:none">'+
+        (st!=='present'?'<button data-st="present">มา</button>':'')+
+        (st!=='absent' ?'<button data-st="absent">ขาด</button>':'')+
+        (st!=='leave'  ?'<button data-st="leave">ลา</button>':'')+
+        '</div></div>';
+    }
     row.innerHTML='<span class="si-no">'+String(s.no).padStart(2,'0')+'</span>'+
       '<span class="si-dot"></span><span class="si-name">'+esc(s.name)+'</span>'+right;
-    row.querySelectorAll('[data-st]').forEach(btn=>{
+    // ปุ่ม pending
+    row.querySelectorAll('.mbtns:not(.edit-btns) [data-st]').forEach(btn=>{
       btn.className=btn.dataset.st==='present'?'bma':btn.dataset.st==='absent'?'bab':'bla';
       btn.addEventListener('click',()=>manualMark(s.name,btn.dataset.st));
     });
+    // badge กดเพื่อแสดงปุ่มแก้ไข
+    const badge=row.querySelector('.badge');
+    const editBtns=row.querySelector('.edit-btns');
+    if(badge&&editBtns){
+      badge.style.cursor='pointer';
+      badge.addEventListener('click',e=>{
+        e.stopPropagation();
+        const shown=editBtns.style.display!=='none';
+        document.querySelectorAll('.edit-btns').forEach(b=>b.style.display='none'); // ปิดอันอื่น
+        editBtns.style.display=shown?'none':'flex';
+      });
+      editBtns.querySelectorAll('[data-st]').forEach(btn=>{
+        btn.className=btn.dataset.st==='present'?'bma':btn.dataset.st==='absent'?'bab':'bla';
+        btn.addEventListener('click',()=>{ editBtns.style.display='none'; manualMark(s.name,btn.dataset.st); });
+      });
+    }
     el.appendChild(row);
   });
   w.innerHTML=''; w.appendChild(el);
