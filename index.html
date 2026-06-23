@@ -528,12 +528,28 @@ const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9m6VzGYBbuvjRCNwb
    แก้โดยส่ง GET ผ่าน CORS proxy (ลอง 2 ตัว fallback อัตโนมัติ)
    POST ส่งตรงได้เลย — ไม่มี redirect
 ════════════════════════════════════════════════════════ */
-// ใช้ corsproxy.io เพียงตัวเดียว — เร็วและเสถียรกว่า allorigins
+// JSONP — ไม่ติด CORS เพราะใช้ <script> tag แทน fetch
+function jsonpGet(targetUrl) {
+  return new Promise((resolve, reject) => {
+    const cb = '_cb' + Date.now();
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      cleanup(); reject(new Error('timeout'));
+    }, 15000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cb];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cb] = (data) => { cleanup(); resolve(data); };
+    script.onerror = () => { cleanup(); reject(new Error('script error')); };
+    script.src = targetUrl + (targetUrl.includes('?') ? '&' : '?') + 'callback=' + cb;
+    document.head.appendChild(script);
+  });
+}
+
 async function proxyGet(targetUrl) {
-  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  return res.json();
+  return jsonpGet(targetUrl);
 }
 
 const API = {
