@@ -1325,15 +1325,20 @@ function renderLog(rows){
   }).join('');
 }
 function loadHistList(){
-  google.script.run.withSuccessHandler(names=>{
+  // ระบบใหม่: เลือกวิชาก่อน แล้วเลือกวันที่
+  if(!curSubj){ document.getElementById('histDetail').innerHTML='<div style="text-align:center;color:var(--t3);font-size:.8rem;padding:16px">เลือกวิชาด้านบนก่อน</div>'; return; }
+  const sheetName = '[บันทึก] ' + curSubj;
+  API.get('getDatesInSheet', { subject: curSubj }).then(dates=>{
     const sel=document.getElementById('histSel');
-    sel.innerHTML='<option value="">— เลือก Sheet บันทึก —</option>';
-    (names||[]).forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n.replace('[บันทึก] ','');sel.appendChild(o);});
-  }).withFailureHandler(()=>{}).getLogSheets();
+    sel.innerHTML='<option value="">— เลือกวันที่ —</option>';
+    (dates||[]).forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;sel.appendChild(o);});
+    if(dates&&dates.length) { sel.value=dates[0]; loadHistDetail(); }
+  }).catch(()=>{});
 }
 function loadHistDetail(){
-  const val=document.getElementById('histSel').value; if(!val)return;
-  google.script.run.withSuccessHandler(d=>renderHistDetail(d)).withFailureHandler(()=>{}).getSummaryBySheet(val);
+  const date=document.getElementById('histSel').value; if(!date||!curSubj)return;
+  const sheetName = '[บันทึก] ' + curSubj;
+  API.get('getSummaryBySheet', { sheetName, date }).then(d=>renderHistDetail(d)).catch(()=>{});
 }
 function renderHistDetail(d){
   const wrap=document.getElementById('histDetail');
