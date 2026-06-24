@@ -667,9 +667,15 @@ const UA        = navigator.userAgent;
 const IS_IOS    = /iPad|iPhone|iPod/.test(UA) ||
                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const IS_ANDROID= /Android/.test(UA);
-const IS_TABLET = (IS_IOS || IS_ANDROID) && Math.min(screen.width,screen.height) >= 600;
-const IS_PHONE  = (IS_IOS || IS_ANDROID) && !IS_TABLET;
-const IS_DESKTOP= !IS_IOS && !IS_ANDROID;
+// Huawei HarmonyOS / MatePad — ตรวจจับโดย touch support + ไม่ใช่ iOS/desktop
+const IS_HUAWEI = /Huawei|HarmonyOS|HUAWEI|HMSCore/.test(UA) ||
+                  (!IS_IOS && !IS_ANDROID && navigator.maxTouchPoints > 0 &&
+                   /Tablet|Mobile/.test(UA));
+const IS_MOBILE = IS_IOS || IS_ANDROID || IS_HUAWEI ||
+                  (navigator.maxTouchPoints > 0 && screen.width <= 1366);
+const IS_TABLET = IS_MOBILE && Math.min(screen.width,screen.height) >= 600;
+const IS_PHONE  = IS_MOBILE && !IS_TABLET;
+const IS_DESKTOP= !IS_MOBILE;
 const SRC       = window.SpeechRecognition || window.webkitSpeechRecognition;
 const SR_OK     = !!SRC;
 const PTT_MODE  = IS_TABLET || IS_PHONE;
@@ -753,12 +759,24 @@ function setupDeviceUI() {
     if (IS_IOS) { micGranted=true; }
     return;
   }
-  if (IS_ANDROID) {
-    renderDevInfo('android','📱','โหมดแท็บเล็ต / มือถือ Android',
+  if (IS_ANDROID || IS_HUAWEI) {
+    const brand = IS_HUAWEI ? 'Huawei / MatePad' : 'Android';
+    renderDevInfo('android','📱','โหมดแท็บเล็ต — '+brand,
       'กดปุ่ม ▶ เพื่อเริ่ม แล้ว<strong>กดค้างปุ่ม 🎤</strong>ขณะนักเรียนพูด<br>หรือกด <strong>มา/ขาด/ลา</strong> แทนได้');
     document.getElementById('pttWrap').style.display = 'flex';
     document.getElementById('tipText').textContent = 'กด ▶ → กดค้าง 🎤 ขณะนักเรียนพูด → ปล่อย → บันทึกอัตโนมัติ';
-    checkMicPermission();
+    if (IS_HUAWEI) {
+      // HarmonyOS อาจไม่รองรับ SR → ใช้ manual mode
+      micGranted = true;
+      if (!SR_OK) {
+        setPill('info','📱 Huawei — กดปุ่มเองได้');
+        document.getElementById('tipText').textContent = 'กด ▶ → กด มา/ขาด/ลา ในรายชื่อได้เลย (ไมค์ไม่รองรับ)';
+      } else {
+        checkMicPermission();
+      }
+    } else {
+      checkMicPermission();
+    }
     return;
   }
   if (IS_IOS) {
