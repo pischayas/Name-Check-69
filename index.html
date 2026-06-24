@@ -289,6 +289,30 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
              padding:7px 9px;outline:none;cursor:pointer;flex:1;min-height:42px}
 .hsel select:focus{border-color:var(--acc)}
 
+/* ── ATTENDANCE SUMMARY ── */
+.sum-wrap{display:flex;flex-direction:column;gap:8px}
+.sum-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
+.sum-chip{font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:12px;
+          background:var(--s2);border:1px solid var(--bdr);color:var(--t2)}
+.sum-chip.warn{background:#fff3cd;border-color:#ffc107;color:#7c5c00}
+.risk-card{border-radius:var(--rs);border:1.5px solid;padding:10px 12px;
+           display:flex;align-items:center;gap:10px;transition:.15s}
+.risk-card.r0{background:#fce8e6;border-color:#f5c6c2}   /* 0-20% */
+.risk-card.r1{background:#fff3cd;border-color:#ffe082}   /* 21-40% */
+.risk-no{font-family:'IBM Plex Mono',monospace;font-size:.65rem;color:var(--t3);min-width:22px;flex-shrink:0}
+.risk-name{flex:1;font-size:.9rem;font-weight:600}
+.risk-card.r0 .risk-name{color:#b71c1c}
+.risk-card.r1 .risk-name{color:#7c5c00}
+.risk-pct{font-family:'IBM Plex Mono',monospace;font-size:1.3rem;font-weight:700;flex-shrink:0}
+.risk-card.r0 .risk-pct{color:var(--red)}
+.risk-card.r1 .risk-pct{color:var(--amb)}
+.risk-detail{font-size:.7rem;color:var(--t2);display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}
+.risk-bar{height:5px;background:var(--bdr);border-radius:3px;margin-top:5px;overflow:hidden}
+.risk-fill{height:100%;border-radius:3px;transition:width .4s}
+.risk-card.r0 .risk-fill{background:var(--red)}
+.risk-card.r1 .risk-fill{background:var(--amb)}
+.sum-ok{text-align:center;padding:20px;color:var(--grn);font-size:.9rem;font-weight:600}
+.sum-empty{text-align:center;padding:20px;color:var(--t3);font-size:.82rem}
 /* ── TOAST ── */
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#323232;
        color:#fff;font-size:.85rem;padding:10px 18px;border-radius:24px;
@@ -480,6 +504,7 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
         <div class="tabs" style="width:100%;border-bottom:none">
           <button class="tabbtn active" onclick="switchTab('log',this)">📋 บันทึกวันนี้</button>
           <button class="tabbtn" onclick="switchTab('hist',this)">📅 ประวัติ</button>
+          <button class="tabbtn" onclick="switchTab('sum',this)">⚠️ สะสม</button>
         </div>
       </div>
       <div class="cb">
@@ -497,10 +522,17 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
         </div>
         <div class="tabp" id="tab-hist">
           <div class="hsel">
-            <select id="histSel" onchange="loadHistDetail()"><option value="">— เลือก Sheet บันทึก —</option></select>
+            <select id="histSel" onchange="loadHistDetail()"><option value="">— เลือกวันที่ —</option></select>
             <button class="btn btn-o btn-sm" onclick="loadHistList()">↺</button>
           </div>
-          <div id="histDetail"><div style="text-align:center;color:var(--t3);font-size:.8rem;padding:16px">เลือก Sheet บันทึกเพื่อดูสรุป</div></div>
+          <div id="histDetail"><div style="text-align:center;color:var(--t3);font-size:.8rem;padding:16px">เลือกวิชาและแท็บนี้เพื่อดูประวัติ</div></div>
+        </div>
+        <div class="tabp" id="tab-sum">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:.76rem;color:var(--t2)">นักเรียนที่มาเรียน <strong style="color:var(--red)">≤ 40%</strong> ของวันที่มีการเช็คชื่อ</span>
+            <button class="btn btn-o btn-sm" onclick="loadSummary()">↺ วิเคราะห์</button>
+          </div>
+          <div id="sumDetail"><div class="sum-empty">เลือกวิชาและกด ↺ เพื่อวิเคราะห์</div></div>
         </div>
       </div>
     </div>
@@ -1376,7 +1408,83 @@ function switchTab(name,btn){
   document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
   document.querySelectorAll('.tabp').forEach(p=>p.classList.remove('active'));
   btn.classList.add('active'); document.getElementById('tab-'+name).classList.add('active');
-  if(name==='hist')loadHistList(); if(name==='log')reloadLog();
+  if(name==='hist') loadHistList();
+  if(name==='log')  reloadLog();
+  if(name==='sum')  loadSummary();
+}
+
+function loadSummary() {
+  if(!curSubj){ document.getElementById('sumDetail').innerHTML='<div class="sum-empty">เลือกวิชาด้านบนก่อน</div>'; return; }
+  document.getElementById('sumDetail').innerHTML='<div class="sum-empty">⏳ กำลังวิเคราะห์ข้อมูล…</div>';
+  API.get('getAttendanceSummary', { subject: curSubj })
+    .then(d => renderSummary(d))
+    .catch(e => { document.getElementById('sumDetail').innerHTML='<div class="sum-empty">❌ โหลดไม่ได้: '+e.message+'</div>'; });
+}
+
+function renderSummary(d) {
+  const wrap = document.getElementById('sumDetail');
+  if(!d || d.days === 0) {
+    wrap.innerHTML='<div class="sum-empty">ยังไม่มีข้อมูลการเช็คชื่อใน Sheet นี้</div>'; return;
+  }
+
+  // กรองเฉพาะ ≤ 40%
+  const risk = (d.students||[]).filter(s => s.pct <= 40);
+  const total = (d.students||[]).length;
+
+  let html = '<div class="sum-wrap">';
+
+  // Meta chips
+  html += '<div class="sum-meta">';
+  html += '<span class="sum-chip">📅 '+d.days+' วันที่มีเช็คชื่อ</span>';
+  html += '<span class="sum-chip">👥 '+total+' คน</span>';
+  html += '<span class="sum-chip warn">⚠️ เสี่ยง '+risk.length+' คน</span>';
+  html += '</div>';
+
+  if(risk.length === 0) {
+    html += '<div class="sum-ok">✅ ไม่มีนักเรียนที่มาเรียนต่ำกว่า 40%</div>';
+  } else {
+    risk.forEach((s,i) => {
+      const cls = s.pct <= 20 ? 'r0' : 'r1';
+      const icon = s.pct <= 20 ? '🔴' : '🟡';
+      html += '<div class="risk-card '+cls+'">';
+      html += '<span class="risk-no">'+(i+1)+'</span>';
+      html += '<div style="flex:1">';
+      html += '<div style="display:flex;align-items:center;gap:6px">';
+      html += '<span class="risk-name">'+esc(s.name)+'</span>';
+      html += '<span style="font-size:.7rem">'+icon+'</span>';
+      html += '</div>';
+      html += '<div class="risk-detail">';
+      html += '<span style="color:var(--grn)">✓ มา '+s.present+'</span>';
+      html += '<span style="color:var(--red)">✗ ขาด '+s.absent+'</span>';
+      html += '<span style="color:var(--pur)">🏥 ลา '+s.leave+'</span>';
+      html += '<span>จาก '+s.checked+' วัน</span>';
+      html += '</div>';
+      html += '<div class="risk-bar"><div class="risk-fill" style="width:'+s.pct+'%"></div></div>';
+      html += '</div>';
+      html += '<span class="risk-pct">'+s.pct+'%</span>';
+      html += '</div>';
+    });
+  }
+
+  // แสดงนักเรียนที่ผ่าน (> 40%) แบบย่อ
+  const pass = (d.students||[]).filter(s => s.pct > 40);
+  if(pass.length > 0) {
+    html += '<details style="margin-top:8px">';
+    html += '<summary style="font-size:.78rem;color:var(--t2);cursor:pointer;padding:6px 0">✅ ผ่านเกณฑ์ '+pass.length+' คน (คลิกเพื่อดู)</summary>';
+    html += '<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">';
+    pass.forEach(s => {
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--gbg);border-radius:6px;border:1px solid var(--gbr)">';
+      html += '<span style="flex:1;font-size:.85rem">'+esc(s.name)+'</span>';
+      html += '<span style="font-family:monospace;font-size:.8rem;color:var(--grn);font-weight:700">'+s.pct+'%</span>';
+      html += '<div style="width:60px;height:4px;background:var(--bdr);border-radius:2px;overflow:hidden">';
+      html += '<div style="height:100%;background:var(--grn);width:'+s.pct+'%;border-radius:2px"></div></div>';
+      html += '</div>';
+    });
+    html += '</div></details>';
+  }
+
+  html += '</div>';
+  wrap.innerHTML = html;
 }
 
 /* ════════════════════════════════════════════════════════
