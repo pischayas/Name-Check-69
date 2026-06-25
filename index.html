@@ -330,6 +330,23 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
 @keyframes spin{to{transform:rotate(360deg)}}
 .lmsg{font-size:.85rem;color:var(--t2)}
 
+/* ── RETRO DATE PICKER ── */
+.retro-bar{background:var(--sur);border:1.5px solid var(--bdr);border-radius:var(--rs);
+           padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.retro-bar.active{border-color:var(--amb);background:#fff8e1}
+.retro-lbl{font-size:.7rem;font-weight:700;color:var(--t2);white-space:nowrap}
+.retro-lbl.on{color:var(--amb)}
+#retroDate{font-family:'Sarabun',sans-serif;font-size:.85rem;background:var(--s2);
+           border:1.5px solid var(--bdr);border-radius:var(--rs);color:var(--txt);
+           padding:6px 10px;outline:none;cursor:pointer;min-height:38px}
+#retroDate:focus{border-color:var(--acc)}
+.retro-badge{font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:12px;
+             background:#fff3cd;color:#7c5c00;border:1px solid #ffc107;display:none}
+.retro-badge.show{display:inline-block}
+.btn-retro-clear{font-family:'Sarabun',sans-serif;font-size:.75rem;font-weight:600;
+                 background:none;border:1.5px solid var(--bdr);border-radius:var(--rs);
+                 color:var(--t2);padding:5px 10px;cursor:pointer;min-height:34px}
+.btn-retro-clear:hover{border-color:var(--red);color:var(--red)}
 /* ── TOUCH TARGETS ── */
 @media(pointer:coarse){
   .stab{min-height:44px;padding:8px 16px}
@@ -432,6 +449,13 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
         <span class="stag" id="stag"></span>
       </div>
       <div class="cb">
+        <!-- Retro date picker -->
+        <div class="retro-bar" id="retroBar">
+          <span class="retro-lbl" id="retroLbl">📅 เช็คย้อนหลัง</span>
+          <input type="date" id="retroDate" title="เลือกวันที่ย้อนหลัง">
+          <span class="retro-badge" id="retroBadge">📅 ย้อนหลัง</span>
+          <button class="btn-retro-clear" id="retroClear" onclick="clearRetro()" style="display:none">✕ กลับวันนี้</button>
+        </div>
         <div class="cpanel">
           <div id="devInfo" style="display:none"></div>
           <div id="micBanner" style="display:none"></div>
@@ -700,11 +724,11 @@ const IS_IOS    = /iPad|iPhone|iPod/.test(UA) ||
                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const IS_ANDROID= /Android/.test(UA);
 // Huawei HarmonyOS / MatePad — ตรวจจับโดย touch support + ไม่ใช่ iOS/desktop
-const IS_HUAWEI = /Huawei|HarmonyOS|HUAWEI|HMSCore/.test(UA) ||
-                  (!IS_IOS && !IS_ANDROID && navigator.maxTouchPoints > 0 &&
-                   /Tablet|Mobile/.test(UA));
+const IS_HUAWEI = /Huawei|HarmonyOS|HUAWEI|HMSCore/.test(UA);
+// Chrome บน Huawei MatePad จะมี "Android" ใน UA ด้วย → จับได้โดย IS_ANDROID
+// ถ้าไม่มี Android ใน UA เลย (HarmonyOS-only) → ใช้ touch detection
 const IS_MOBILE = IS_IOS || IS_ANDROID || IS_HUAWEI ||
-                  (navigator.maxTouchPoints > 0 && screen.width <= 1366);
+                  (!IS_IOS && navigator.maxTouchPoints > 1 && screen.width <= 1600);
 const IS_TABLET = IS_MOBILE && Math.min(screen.width,screen.height) >= 600;
 const IS_PHONE  = IS_MOBILE && !IS_TABLET;
 const IS_DESKTOP= !IS_MOBILE;
@@ -720,6 +744,7 @@ let sessionOn=false, recog=null, listenTmr=null;
 let audioCtx=null, analyser=null, micStream=null;
 let micGranted=false, srStarting=false;
 let pttActive=false;
+let retroDateVal=null; // null = วันนี้, string = วันย้อนหลัง (YYYY-MM-DD)
 
 const KW = {
   present:['มา','มาครับ','มาค่ะ','มาแล้ว','ครับ','ค่ะ','here','yes','present','ฮะ'],
@@ -771,6 +796,35 @@ window.addEventListener('load', () => {
   document.getElementById('btnAbsent').addEventListener('click', ()=>confirmSt('absent'));
   document.getElementById('btnLeave').addEventListener('click',  ()=>confirmSt('leave'));
 
+  // Retro date picker
+  const rdInput = document.getElementById('retroDate');
+  // ตั้ง max = วันนี้, default = วันนี้
+  const todayISO = new Date().toISOString().split('T')[0];
+  rdInput.max = todayISO;
+  rdInput.value = todayISO;
+  rdInput.addEventListener('change', () => {
+    const val = rdInput.value;
+    const todayChk = new Date().toISOString().split('T')[0];
+    if (!val || val === todayChk) {
+      clearRetro();
+    } else {
+      retroDateVal = val;
+      // แปลง YYYY-MM-DD → dd/mm/yyyy พ.ศ.
+      const [y,m,d] = val.split('-');
+      const thaiY = parseInt(y)+543;
+      const display = d+'/'+m+'/'+thaiY;
+      document.getElementById('retroBadge').textContent = '📅 '+display;
+      document.getElementById('retroBadge').classList.add('show');
+      document.getElementById('retroClear').style.display = '';
+      document.getElementById('retroBar').classList.add('active');
+      document.getElementById('retroLbl').textContent = '📅 เช็คย้อนหลัง:';
+      document.getElementById('retroLbl').classList.add('on');
+      // โหลดข้อมูลที่บันทึกไว้วันนั้น (ถ้ามี)
+      if(curSubj) loadRetroLog(display);
+      toast('📅 เช็คย้อนหลัง: '+display);
+    }
+  });
+
   if (PTT_MODE) setupPTT();
 });
 
@@ -792,22 +846,29 @@ function setupDeviceUI() {
     return;
   }
   if (IS_ANDROID || IS_HUAWEI) {
-    const brand = IS_HUAWEI ? 'Huawei / MatePad' : 'Android';
+    const brand = IS_HUAWEI && !IS_ANDROID ? 'Huawei HarmonyOS' : IS_HUAWEI ? 'Huawei MatePad' : 'Android';
     renderDevInfo('android','📱','โหมดแท็บเล็ต — '+brand,
-      'กดปุ่ม ▶ เพื่อเริ่ม แล้ว<strong>กดค้างปุ่ม 🎤</strong>ขณะนักเรียนพูด<br>หรือกด <strong>มา/ขาด/ลา</strong> แทนได้');
-    document.getElementById('pttWrap').style.display = 'flex';
-    document.getElementById('tipText').textContent = 'กด ▶ → กดค้าง 🎤 ขณะนักเรียนพูด → ปล่อย → บันทึกอัตโนมัติ';
-    if (IS_HUAWEI) {
-      // HarmonyOS อาจไม่รองรับ SR → ใช้ manual mode
-      micGranted = true;
-      if (!SR_OK) {
-        setPill('info','📱 Huawei — กดปุ่มเองได้');
-        document.getElementById('tipText').textContent = 'กด ▶ → กด มา/ขาด/ลา ในรายชื่อได้เลย (ไมค์ไม่รองรับ)';
-      } else {
-        checkMicPermission();
-      }
+      SR_OK
+        ? 'กดปุ่ม ▶ เพื่อเริ่ม แล้ว<strong>กดค้างปุ่ม 🎤</strong>ขณะนักเรียนพูด<br>หรือกด <strong>มา/ขาด/ลา</strong> ในรายชื่อแทนได้'
+        : 'เบราว์เซอร์นี้ไม่รองรับไมค์ — กด <strong>มา/ขาด/ลา</strong> ในรายชื่อแทนได้');
+    document.getElementById('pttWrap').style.display = SR_OK ? 'flex' : 'none';
+    document.getElementById('tipText').textContent = SR_OK
+      ? 'กด ▶ → กดค้าง 🎤 ขณะนักเรียนพูด → ปล่อย → บันทึกอัตโนมัติ'
+      : 'กด ▶ → กด มา/ขาด/ลา ในรายชื่อด้านซ้าย → บันทึกอัตโนมัติ';
+    if (SR_OK) {
+      // Chrome Android: ต้อง getUserMedia ก่อนเสมอ แม้จะเคยอนุญาตแล้ว
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          micStream = stream;
+          grantMic(stream);
+        })
+        .catch(err => {
+          if (err.name === 'NotAllowedError') denyMic();
+          else { setPill('err','❌ เปิดไมค์ไม่ได้'); }
+        });
     } else {
-      checkMicPermission();
+      micGranted = true;
+      setPill('info','📱 กดปุ่มเองได้');
     }
     return;
   }
@@ -960,6 +1021,11 @@ function startPTT() {
   if (pttActive) return;
   if (!micGranted && !IS_IOS) { showMicBanner(); requestMicPermission(); return; }
   pttActive = true;
+  // Android: suspend AudioContext ก่อน SR
+  if(IS_ANDROID || IS_HUAWEI) {
+    if(audioCtx && audioCtx.state==='running') try{audioCtx.suspend();}catch(e){}
+    if(micStream) micStream.getTracks().forEach(t=>{try{t.enabled=false;}catch(e){}});
+  }
   const btn = document.getElementById('pttBtn');
   btn.classList.add('pressing','listening');
   document.getElementById('pttIcon').textContent  = '🔴';
@@ -975,6 +1041,11 @@ function startPTT() {
 function stopPTT() {
   if (!pttActive) return;
   pttActive = false;
+  // resume AudioContext หลังปล่อยปุ่ม
+  if(IS_ANDROID || IS_HUAWEI) {
+    if(audioCtx && audioCtx.state==='suspended') try{audioCtx.resume();}catch(e){}
+    if(micStream) micStream.getTracks().forEach(t=>{try{t.enabled=true;}catch(e){}});
+  }
   const btn = document.getElementById('pttBtn');
   btn.classList.remove('pressing','listening');
   document.getElementById('pttIcon').textContent  = '🎤';
@@ -1245,13 +1316,31 @@ function startRecog(){
   if(!micGranted&&!IS_IOS) return;
   if(srStarting) return;
   if(recog){ try{recog.abort();}catch(e){} recog=null; }
+
+  // Chrome Android: ต้องหยุด AudioContext และ suspend stream ก่อน SR จะทำงานได้
+  // เพราะ AudioContext กับ SR แย่ง stream กัน
+  if(IS_ANDROID || IS_HUAWEI) {
+    if(audioCtx && audioCtx.state === 'running') {
+      try { audioCtx.suspend(); } catch(e) {}
+    }
+    if(micStream) {
+      micStream.getTracks().forEach(t => { try{ t.enabled = false; }catch(e){} });
+    }
+  }
+
   srStarting = true;
   recog = new SRC();
   recog.lang = 'th-TH';
   recog.continuous = false;
   recog.interimResults = true;
   recog.maxAlternatives = 5;
-  recog.onstart = () => { srStarting = false; };
+  recog.onstart = () => {
+    srStarting = false;
+    // Chrome Android: resume volume meter หลัง SR start
+    if(IS_ANDROID || IS_HUAWEI) {
+      if(micStream) micStream.getTracks().forEach(t => { try{ t.enabled = true; }catch(e){} });
+    }
+  };
   recog.onresult = e => {
     const txts=[];
     for(let i=0;i<e.results.length;i++)
@@ -1298,6 +1387,13 @@ function startRecog(){
 function stopRecog(){
   srStarting=false;
   if(recog){try{recog.abort();}catch(e){}recog=null;}
+  // resume AudioContext หลัง SR หยุด เพื่อ volume meter ทำงานได้
+  if(audioCtx && audioCtx.state === 'suspended') {
+    try { audioCtx.resume(); } catch(e) {}
+  }
+  if(micStream) {
+    micStream.getTracks().forEach(t => { try{ t.enabled = true; }catch(e){} });
+  }
 }
 function clearTimer(){if(listenTmr){clearTimeout(listenTmr);listenTmr=null;}}
 
@@ -1334,18 +1430,66 @@ function processResponse(txts){
 /* ════════════════════════════════════════════════════════
    SAVE / LOG / HISTORY / RESET / EXPORT / TABS
 ════════════════════════════════════════════════════════ */
+// แปลง YYYY-MM-DD → dd/mm/พ.ศ.
+function isoToThai(iso) {
+  if(!iso) return null;
+  const [y,m,d] = iso.split('-');
+  return d+'/'+m+'/'+(parseInt(y)+543);
+}
+
+function getRetroDate() {
+  // คืนวันที่ในรูปแบบ dd/mm/พ.ศ. หรือ null (= วันนี้)
+  return retroDateVal ? isoToThai(retroDateVal) : null;
+}
+
+function clearRetro() {
+  retroDateVal = null;
+  const todayISO = new Date().toISOString().split('T')[0];
+  document.getElementById('retroDate').value = todayISO;
+  document.getElementById('retroBadge').classList.remove('show');
+  document.getElementById('retroClear').style.display = 'none';
+  document.getElementById('retroBar').classList.remove('active');
+  document.getElementById('retroLbl').textContent = '📅 เช็คย้อนหลัง';
+  document.getElementById('retroLbl').classList.remove('on');
+  // reset นักเรียนกลับ pending แล้วโหลด log วันนี้
+  if(curSubj) { students.forEach(s=>s._st='pending'); syncLog(); }
+  toast('↩ กลับมาเช็คชื่อวันนี้แล้ว');
+}
+
+function loadRetroLog(thaiDate) {
+  // โหลดข้อมูลที่บันทึกไว้ในวันนั้น เพื่อแสดงสถานะเดิม
+  API.get('getLogByDate', { subject: curSubj, date: thaiDate })
+    .then(logs => {
+      students.forEach(s => s._st = 'pending');
+      (logs||[]).forEach(r => {
+        const s = students.find(x => x.name === r.name);
+        if(s) s._st = r.status.includes('มา') ? 'present' : r.status.includes('ลา') ? 'leave' : 'absent';
+      });
+      let fi = students.findIndex(s => s._st === 'pending');
+      callIdx = fi >= 0 ? fi : 0;
+      renderList(); updateStats();
+    })
+    .catch(()=>{});
+}
+
 function saveRecord(name,status,note){
   if(!curSubj)return; setSave('saving');
-  google.script.run
-    .withSuccessHandler(()=>{setSave('saved');setTimeout(()=>setSave(''),2500);reloadLog();})
-    .withFailureHandler(()=>{setSave('');toast('บันทึกไม่สำเร็จ');})
-    .logAttendance(curSubj,name,status,note||'');
+  const retroDate = getRetroDate(); // null = วันนี้
+  API.post({ action:'logAttendance', subject:curSubj, name, status, note:note||'', retroDate })
+    .then(()=>{ setSave('saved'); setTimeout(()=>setSave(''),2500); reloadLog(); })
+    .catch(()=>{ setSave(''); toast('บันทึกไม่สำเร็จ'); });
 }
 function setSave(s){const el=document.getElementById('stag');el.className='stag '+s;
   el.textContent=s==='saving'?'⏳ บันทึก…':s==='saved'?'✅ บันทึกแล้ว':'';}
 function reloadLog(){
   if(!curSubj)return;
-  google.script.run.withSuccessHandler(d=>renderLog(d||[])).withFailureHandler(()=>{}).getTodayLog(curSubj);
+  const retroDate = getRetroDate();
+  if(retroDate) {
+    API.get('getLogByDate', { subject:curSubj, date:retroDate })
+      .then(d=>renderLog(d||[])).catch(()=>{});
+  } else {
+    google.script.run.withSuccessHandler(d=>renderLog(d||[])).withFailureHandler(()=>{}).getTodayLog(curSubj);
+  }
 }
 function renderLog(rows){
   const tb=document.getElementById('logBody');
@@ -1390,11 +1534,15 @@ function renderHistDetail(d){
 }
 function resetToday(){
   if(!curSubj){toast('เลือกวิชาก่อน');return;}
-  if(!confirm('รีเซ็ตบันทึกวันนี้ของวิชา "'+curSubj+'"?'))return;
+  const retroDate = getRetroDate();
+  const dateLabel = retroDate || 'วันนี้';
+  if(!confirm('รีเซ็ตบันทึก '+dateLabel+' ของวิชา "'+curSubj+'"?'))return;
   if(sessionOn)stopSession();
   students.forEach(s=>s._st='pending'); callIdx=students.findIndex(s=>s._st==='pending'); if(callIdx<0)callIdx=0;
   renderList();updateStats();clearCbox();
-  google.script.run.withSuccessHandler(()=>{toast('รีเซ็ตสำเร็จ');reloadLog();}).withFailureHandler(()=>toast('เกิดข้อผิดพลาด')).clearTodayLog(curSubj);
+  API.post({ action:'clearTodayLog', subject:curSubj, retroDate: retroDate||null })
+    .then(()=>{ toast('รีเซ็ตสำเร็จ'); reloadLog(); })
+    .catch(()=>toast('เกิดข้อผิดพลาด'));
 }
 function exportCSV(){
   if(!students.length){toast('ไม่มีข้อมูล');return;}
