@@ -330,6 +330,27 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
 @keyframes spin{to{transform:rotate(360deg)}}
 .lmsg{font-size:.85rem;color:var(--t2)}
 
+/* ── GROQ SETTINGS ── */
+.groq-bar{background:linear-gradient(135deg,#f0f4ff,#e8f0fe);border:1.5px solid #AECBFA;
+          border-radius:var(--rs);padding:10px 14px;display:flex;align-items:center;
+          gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.groq-bar.ok{background:linear-gradient(135deg,#e6f4ea,#f0faf2);border-color:var(--gbr)}
+.groq-bar.err{background:linear-gradient(135deg,#fce8e6,#fff5f5);border-color:var(--rbr)}
+.groq-lbl{font-size:.72rem;font-weight:700;color:#1558B0;white-space:nowrap;flex-shrink:0}
+.groq-bar.ok .groq-lbl{color:var(--grn)}
+.groq-bar.err .groq-lbl{color:var(--red)}
+#groqKey{font-family:'IBM Plex Mono',monospace;font-size:.78rem;background:#fff;
+         border:1.5px solid #AECBFA;border-radius:var(--rs);color:var(--txt);
+         padding:6px 10px;outline:none;flex:1;min-width:180px;min-height:36px;
+         letter-spacing:.05em}
+#groqKey:focus{border-color:var(--acc)}
+#groqKey::placeholder{color:var(--t3);font-family:'Sarabun',sans-serif;letter-spacing:0}
+.btn-groq-save{font-family:'Sarabun',sans-serif;font-size:.78rem;font-weight:700;
+               background:var(--acc);color:#fff;border:none;border-radius:var(--rs);
+               padding:6px 14px;cursor:pointer;min-height:36px;flex-shrink:0;transition:.15s}
+.btn-groq-save:hover{background:var(--adk)}
+.groq-status{font-size:.7rem;font-weight:600;white-space:nowrap}
+.groq-status.ok{color:var(--grn)}.groq-status.err{color:var(--red)}.groq-status.wait{color:var(--amb)}
 /* ── RETRO DATE PICKER ── */
 .retro-bar{background:var(--sur);border:1.5px solid var(--bdr);border-radius:var(--rs);
            padding:8px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
@@ -449,6 +470,13 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
         <span class="stag" id="stag"></span>
       </div>
       <div class="cb">
+        <!-- Groq API Key -->
+        <div class="groq-bar" id="groqBar">
+          <span class="groq-lbl" id="groqLbl">🤖 Groq API Key</span>
+          <input type="password" id="groqKey" placeholder="gsk_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
+          <button class="btn-groq-save" onclick="saveGroqKey()">บันทึก</button>
+          <span class="groq-status" id="groqStatus"></span>
+        </div>
         <!-- Retro date picker -->
         <div class="retro-bar" id="retroBar">
           <span class="retro-lbl" id="retroLbl">📅 เช็คย้อนหลัง</span>
@@ -745,6 +773,11 @@ let audioCtx=null, analyser=null, micStream=null;
 let micGranted=false, srStarting=false;
 let pttActive=false;
 let retroDateVal=null; // null = วันนี้, string = วันย้อนหลัง (YYYY-MM-DD)
+let groqApiKey = '';       // Groq API Key
+let mediaRecorder = null;  // สำหรับ Groq mode
+let audioChunks = [];      // เก็บ audio chunks
+let groqMode = false;      // true = ใช้ Groq แทน Web Speech API
+let isRecording = false;   // กำลังอัดเสียงอยู่
 
 const KW = {
   present:['มา','มาครับ','มาค่ะ','มาแล้ว','ครับ','ค่ะ','here','yes','present','ฮะ'],
@@ -795,6 +828,15 @@ window.addEventListener('load', () => {
   document.getElementById('btnPresent').addEventListener('click',()=>confirmSt('present'));
   document.getElementById('btnAbsent').addEventListener('click', ()=>confirmSt('absent'));
   document.getElementById('btnLeave').addEventListener('click',  ()=>confirmSt('leave'));
+
+  // โหลด Groq API Key จาก localStorage
+  const savedKey = localStorage.getItem('groq_api_key') || '';
+  if (savedKey) {
+    groqApiKey = savedKey;
+    document.getElementById('groqKey').value = savedKey;
+    setGroqStatus('ok', '✅ พร้อมใช้งาน');
+    groqMode = true;
+  }
 
   // Retro date picker
   const rdInput = document.getElementById('retroDate');
@@ -1004,14 +1046,26 @@ function startVolumeMeter(stream) {
 function setupPTT() {
   const btn = document.getElementById('pttBtn');
   let pttDebounce = null;
-  function onStart(e) { e.preventDefault(); clearTimeout(pttDebounce); startPTT(); }
-  function onEnd(e)   { e.preventDefault(); pttDebounce = setTimeout(stopPTT, 120); }
+  function onStart(e) {
+    e.preventDefault();
+    clearTimeout(pttDebounce);
+    if (groqMode) startGroqPTT();
+    else startPTT();
+  }
+  function onEnd(e) {
+    e.preventDefault();
+    if (groqMode) pttDebounce = setTimeout(stopGroqPTT, 120);
+    else pttDebounce = setTimeout(stopPTT, 120);
+  }
   btn.addEventListener('touchstart', onStart, { passive:false });
   btn.addEventListener('touchend',   onEnd,   { passive:false });
   btn.addEventListener('touchcancel',onEnd,   { passive:false });
   btn.addEventListener('mousedown',  onStart);
   btn.addEventListener('mouseup',    onEnd);
-  btn.addEventListener('mouseleave', ()=>{ if(pttActive) stopPTT(); });
+  btn.addEventListener('mouseleave', ()=>{
+    if(groqMode){ if(isRecording) stopGroqPTT(); }
+    else { if(pttActive) stopPTT(); }
+  });
 }
 
 function startPTT() {
@@ -1200,8 +1254,13 @@ function manualMark(name,st){
 async function toggleCall(){
   if(!curSubj){toast('เลือกวิชาก่อน');return;}
   if(!students.length){toast('ไม่พบรายชื่อ');return;}
-  if(!SR_OK){toast('❌ กรุณาใช้ Chrome หรือ Safari');return;}
   if(sessionOn){stopSession();return;}
+  // Groq mode — ไม่ต้องการ SR_OK
+  if(groqMode){
+    startSession();
+    return;
+  }
+  if(!SR_OK){toast('❌ กรุณาใช้ Chrome หรือ Safari หรือใส่ Groq API Key');return;}
   if(!micGranted && !IS_IOS){
     await requestMicPermission();
     if(!micGranted) return;
@@ -1216,7 +1275,13 @@ function startSession(){
   document.getElementById('prevBtn').disabled=false;
   document.getElementById('cprog').style.display='flex';
   if(PTT_MODE) document.getElementById('pttBtn').disabled=false;
-  if(IS_DESKTOP){
+  if(IS_DESKTOP && groqMode){
+    document.getElementById('pttWrap').style.display='flex';
+    document.getElementById('tipText').textContent='กด ▶ → กดค้าง 🎤 ขณะนักเรียนพูด → Groq แปลงอัตโนมัติ';
+  } else if(IS_DESKTOP && groqMode){
+    document.getElementById('pttWrap').style.display='flex';
+    document.getElementById('tipText').textContent='กด ▶ → กดค้าง 🎤 ขณะนักเรียนพูด → Groq แปลงอัตโนมัติ';
+  } else if(IS_DESKTOP){
     document.getElementById('waveIdle').style.display='none';
     document.getElementById('waveBars').style.display='flex';
   }
@@ -1253,7 +1318,9 @@ function callStudent(idx){
   document.getElementById('confName').textContent=s.name;
   renderList();
   const el=document.getElementById('si'+s.no); if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
-  if(IS_DESKTOP&&SR_OK){ startRecog(); clearTimer();
+  if(IS_DESKTOP && groqMode){
+    setStatus('🎤 กดค้างปุ่ม 🎤 แล้วให้นักเรียนพูด','w');
+  } else if(IS_DESKTOP&&SR_OK){ startRecog(); clearTimer();
     listenTmr=setTimeout(()=>{
       if(!sessionOn)return;
       const cur=students[callIdx];
@@ -1430,6 +1497,128 @@ function processResponse(txts){
 /* ════════════════════════════════════════════════════════
    SAVE / LOG / HISTORY / RESET / EXPORT / TABS
 ════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════
+   GROQ WHISPER — อัดเสียงแล้วส่งไป Groq transcribe
+════════════════════════════════════════════════════════ */
+
+function setGroqStatus(state, msg) {
+  const bar = document.getElementById('groqBar');
+  const lbl = document.getElementById('groqLbl');
+  const st  = document.getElementById('groqStatus');
+  bar.className = 'groq-bar ' + (state==='ok'?'ok':state==='err'?'err':'');
+  st.className  = 'groq-status ' + state;
+  st.textContent = msg;
+  if(state==='ok') lbl.textContent = '🤖 Groq Whisper';
+  else if(state==='err') lbl.textContent = '🤖 Groq API Key';
+  else lbl.textContent = '🤖 Groq API Key';
+}
+
+function saveGroqKey() {
+  const key = document.getElementById('groqKey').value.trim();
+  if (!key) { setGroqStatus('err','❌ กรุณากรอก Key ก่อน'); return; }
+  if (!key.startsWith('gsk_')) { setGroqStatus('err','❌ Key ต้องขึ้นต้นด้วย gsk_'); return; }
+  setGroqStatus('wait','⏳ กำลังตรวจสอบ…');
+  // ทดสอบ Key โดย list models
+  fetch('https://api.groq.com/openai/v1/models', {
+    headers: { 'Authorization': 'Bearer ' + key }
+  }).then(r => {
+    if (r.ok) {
+      groqApiKey = key;
+      groqMode = true;
+      localStorage.setItem('groq_api_key', key);
+      setGroqStatus('ok','✅ พร้อมใช้งาน');
+      toast('✅ Groq API Key บันทึกแล้ว — ใช้ Whisper แทน Web Speech');
+      // อัปเดต mic pill
+      setPill('ok','🤖 Groq Whisper พร้อม');
+    } else {
+      setGroqStatus('err','❌ Key ไม่ถูกต้อง ('+r.status+')');
+      groqMode = false;
+    }
+  }).catch(() => setGroqStatus('err','❌ เชื่อมต่อ Groq ไม่ได้'));
+}
+
+async function transcribeWithGroq(audioBlob) {
+  const formData = new FormData();
+  formData.append('file', audioBlob, 'audio.webm');
+  formData.append('model', 'whisper-large-v3-turbo');
+  formData.append('language', 'th');
+  formData.append('response_format', 'json');
+  formData.append('temperature', '0');
+  // prompt ช่วยให้ Whisper เข้าใจ context การเช็คชื่อ
+  formData.append('prompt', 'นักเรียนตอบการเช็คชื่อ เช่น มาครับ มาค่ะ ไม่มา ขาด ลาครับ ลาค่ะ ป่วย');
+
+  const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + groqApiKey },
+    body: formData
+  });
+  if (!res.ok) throw new Error('Groq HTTP ' + res.status);
+  const data = await res.json();
+  return data.text || '';
+}
+
+// PTT สำหรับ Groq mode — อัดเสียงขณะกดค้าง
+function startGroqPTT() {
+  if (!sessionOn || isRecording) return;
+  if (!groqApiKey) { toast('❌ กรุณาใส่ Groq API Key ก่อน'); return; }
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(stream => {
+      isRecording = true;
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorder.ondataavailable = e => { if(e.data.size>0) audioChunks.push(e.data); };
+      mediaRecorder.start(100);
+      // UI feedback
+      const btn = document.getElementById('pttBtn');
+      btn.classList.add('pressing','listening');
+      document.getElementById('pttIcon').textContent  = '🔴';
+      document.getElementById('pttLabel').textContent = 'กำลังอัดเสียง…';
+      document.getElementById('cheard').textContent   = '🎤 กำลังฟัง…';
+      document.getElementById('waveIdle').style.display = 'none';
+      document.getElementById('waveBars').style.display = 'flex';
+    })
+    .catch(() => toast('❌ เปิดไมค์ไม่ได้'));
+}
+
+async function stopGroqPTT() {
+  if (!isRecording || !mediaRecorder) return;
+  isRecording = false;
+
+  return new Promise(resolve => {
+    mediaRecorder.onstop = async () => {
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      mediaRecorder.stream.getTracks().forEach(t => t.stop());
+      mediaRecorder = null;
+
+      // UI
+      const btn = document.getElementById('pttBtn');
+      btn.classList.remove('pressing','listening');
+      document.getElementById('pttIcon').textContent  = '🤖';
+      document.getElementById('pttLabel').textContent = '⏳ กำลังแปลงเสียง…';
+      document.getElementById('waveBars').style.display = 'none';
+      document.getElementById('waveIdle').style.display = '';
+
+      try {
+        document.getElementById('cheard').textContent = '⏳ Groq กำลังแปลง…';
+        const text = await transcribeWithGroq(blob);
+        if (text) {
+          document.getElementById('cheard').textContent = 'ได้ยิน: "' + text + '"';
+          processResponse([text]);
+        } else {
+          document.getElementById('cheard').textContent = '❓ ไม่ได้ยินเสียง ลองใหม่';
+        }
+      } catch(e) {
+        document.getElementById('cheard').textContent = '❌ Groq error: ' + e.message;
+        toast('❌ Groq: ' + e.message);
+      }
+      document.getElementById('pttIcon').textContent  = '🎤';
+      document.getElementById('pttLabel').textContent = 'กดค้างเพื่อพูด';
+      resolve();
+    };
+    mediaRecorder.stop();
+  });
+}
+
 // แปลง YYYY-MM-DD → dd/mm/พ.ศ.
 function isoToThai(iso) {
   if(!iso) return null;
