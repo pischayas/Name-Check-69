@@ -470,60 +470,12 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
         <span class="stag" id="stag"></span>
       </div>
       <div class="cb">
-        <!-- Groq status chip (มุมบนขวาของ cpanel) -->
-        <div id="groqChip" style="position:absolute;top:10px;right:10px;z-index:10;
-             display:flex;align-items:center;gap:6px">
-          <span class="groq-status" id="groqStatus" style="font-size:.68rem;
-            background:rgba(255,255,255,.85);padding:3px 9px;border-radius:12px;
-            border:1px solid var(--bdr);backdrop-filter:blur(4px)">⚙️ ยังไม่ตั้งค่า Groq</span>
-          <button onclick="showGroqEdit()" title="ตั้งค่า Groq API Key"
-            style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--bdr);
-            background:rgba(255,255,255,.85);cursor:pointer;font-size:.8rem;
-            display:flex;align-items:center;justify-content:center;
-            backdrop-filter:blur(4px);transition:.15s;flex-shrink:0"
-            id="groqEditBtn" onmouseover="this.style.borderColor='var(--acc)'"
-            onmouseout="this.style.borderColor='var(--bdr)'">⚙️</button>
-        </div>
-
-        <!-- Modal แก้ไข Groq Key -->
-        <div id="groqModal" style="display:none;position:fixed;inset:0;z-index:600;
-             background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:20px">
-          <div style="background:var(--sur);border-radius:var(--r);padding:20px;
-               width:100%;max-width:420px;box-shadow:var(--shm)">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-              <span style="font-size:1rem;font-weight:700">🤖 ตั้งค่า Groq API Key</span>
-              <button onclick="hideGroqEdit()" style="background:none;border:none;
-                font-size:1.2rem;cursor:pointer;color:var(--t2);padding:4px">✕</button>
-            </div>
-            <div style="font-size:.78rem;color:var(--t2);margin-bottom:10px;line-height:1.6">
-              สมัครฟรีที่ <strong>console.groq.com</strong><br>
-              API Keys → Create API Key → คัดลอกมาวางด้านล่าง
-            </div>
-            <input type="password" id="groqKey"
-              placeholder="gsk_xxxxxxxxxxxxxxxxxxxx"
-              autocomplete="off" spellcheck="false"
-              style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:.82rem;
-              background:var(--s2);border:1.5px solid var(--bdr);border-radius:var(--rs);
-              color:var(--txt);padding:10px 12px;outline:none;margin-bottom:12px;
-              min-height:44px;box-sizing:border-box">
-            <div style="display:flex;gap:8px">
-              <button onclick="saveGroqKey()"
-                style="flex:1;font-family:'Sarabun',sans-serif;font-size:.9rem;font-weight:700;
-                background:var(--acc);color:#fff;border:none;border-radius:var(--rs);
-                padding:12px;cursor:pointer;min-height:var(--touch);transition:.15s">
-                💾 บันทึก
-              </button>
-              <button onclick="hideGroqEdit()"
-                style="font-family:'Sarabun',sans-serif;font-size:.9rem;font-weight:600;
-                background:var(--s2);color:var(--t2);border:1.5px solid var(--bdr);
-                border-radius:var(--rs);padding:12px 16px;cursor:pointer;
-                min-height:var(--touch);transition:.15s">
-                ยกเลิก
-              </button>
-            </div>
-            <div id="groqModalStatus" style="margin-top:10px;font-size:.78rem;
-              text-align:center;min-height:1.2em"></div>
-          </div>
+        <!-- Groq API Key -->
+        <div class="groq-bar" id="groqBar">
+          <span class="groq-lbl" id="groqLbl">🤖 Groq API Key</span>
+          <input type="password" id="groqKey" placeholder="gsk_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
+          <button class="btn-groq-save" onclick="saveGroqKey()">บันทึก</button>
+          <span class="groq-status" id="groqStatus"></span>
         </div>
         <!-- Retro date picker -->
         <div class="retro-bar" id="retroBar">
@@ -532,7 +484,7 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
           <span class="retro-badge" id="retroBadge">📅 ย้อนหลัง</span>
           <button class="btn-retro-clear" id="retroClear" onclick="clearRetro()" style="display:none">✕ กลับวันนี้</button>
         </div>
-        <div class="cpanel" style="position:relative">
+        <div class="cpanel">
           <div id="devInfo" style="display:none"></div>
           <div id="micBanner" style="display:none"></div>
 
@@ -881,9 +833,9 @@ window.addEventListener('load', () => {
   const savedKey = localStorage.getItem('groq_api_key') || '';
   if (savedKey) {
     groqApiKey = savedKey;
+    document.getElementById('groqKey').value = savedKey;
+    setGroqStatus('ok', '✅ พร้อมใช้งาน');
     groqMode = true;
-    // ตั้ง status หลัง DOM โหลดเสร็จ
-    setTimeout(() => setGroqStatus('ok', '✅ Groq Whisper พร้อม'), 100);
   }
 
   // Retro date picker
@@ -1550,34 +1502,15 @@ function processResponse(txts){
 ════════════════════════════════════════════════════════ */
 
 function setGroqStatus(state, msg) {
-  const chip = document.getElementById('groqStatus');
-  if (!chip) return;
-  chip.textContent = msg;
-  chip.style.background = state==='ok'  ? 'rgba(230,244,234,.95)' :
-                          state==='err' ? 'rgba(252,232,230,.95)' :
-                          state==='wait'? 'rgba(254,247,224,.95)' :
-                                          'rgba(255,255,255,.85)';
-  chip.style.borderColor = state==='ok'  ? 'var(--gbr)' :
-                           state==='err' ? 'var(--rbr)' :
-                           state==='wait'? '#ffe082'    : 'var(--bdr)';
-  chip.style.color = state==='ok'  ? 'var(--grn)' :
-                     state==='err' ? 'var(--red)'  :
-                     state==='wait'? 'var(--amb)'  : 'var(--t2)';
-  const ms = document.getElementById('groqModalStatus');
-  if (ms) { ms.textContent = msg; ms.style.color = state==='ok'?'var(--grn)':state==='err'?'var(--red)':'var(--amb)'; }
-}
-
-function showGroqEdit() {
-  const modal = document.getElementById('groqModal');
-  modal.style.display = 'flex';
-  if (groqApiKey) document.getElementById('groqKey').value = groqApiKey;
-  setTimeout(()=>document.getElementById('groqKey').focus(), 100);
-  document.getElementById('groqModalStatus').textContent = '';
-}
-
-function hideGroqEdit() {
-  document.getElementById('groqModal').style.display = 'none';
-  document.getElementById('groqModalStatus').textContent = '';
+  const bar = document.getElementById('groqBar');
+  const lbl = document.getElementById('groqLbl');
+  const st  = document.getElementById('groqStatus');
+  bar.className = 'groq-bar ' + (state==='ok'?'ok':state==='err'?'err':'');
+  st.className  = 'groq-status ' + state;
+  st.textContent = msg;
+  if(state==='ok') lbl.textContent = '🤖 Groq Whisper';
+  else if(state==='err') lbl.textContent = '🤖 Groq API Key';
+  else lbl.textContent = '🤖 Groq API Key';
 }
 
 function saveGroqKey() {
@@ -1585,6 +1518,7 @@ function saveGroqKey() {
   if (!key) { setGroqStatus('err','❌ กรุณากรอก Key ก่อน'); return; }
   if (!key.startsWith('gsk_')) { setGroqStatus('err','❌ Key ต้องขึ้นต้นด้วย gsk_'); return; }
   setGroqStatus('wait','⏳ กำลังตรวจสอบ…');
+  // ทดสอบ Key โดย list models
   fetch('https://api.groq.com/openai/v1/models', {
     headers: { 'Authorization': 'Bearer ' + key }
   }).then(r => {
@@ -1592,10 +1526,10 @@ function saveGroqKey() {
       groqApiKey = key;
       groqMode = true;
       localStorage.setItem('groq_api_key', key);
-      setGroqStatus('ok','✅ Groq Whisper พร้อมใช้');
+      setGroqStatus('ok','✅ พร้อมใช้งาน');
+      toast('✅ Groq API Key บันทึกแล้ว — ใช้ Whisper แทน Web Speech');
+      // อัปเดต mic pill
       setPill('ok','🤖 Groq Whisper พร้อม');
-      toast('✅ บันทึก Groq Key แล้ว');
-      setTimeout(hideGroqEdit, 1200);
     } else {
       setGroqStatus('err','❌ Key ไม่ถูกต้อง ('+r.status+')');
       groqMode = false;
