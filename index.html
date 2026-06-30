@@ -470,12 +470,60 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
         <span class="stag" id="stag"></span>
       </div>
       <div class="cb">
-        <!-- Groq API Key -->
-        <div class="groq-bar" id="groqBar">
-          <span class="groq-lbl" id="groqLbl">🤖 Groq API Key</span>
-          <input type="password" id="groqKey" placeholder="gsk_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false">
-          <button class="btn-groq-save" onclick="saveGroqKey()">บันทึก</button>
-          <span class="groq-status" id="groqStatus"></span>
+        <!-- Groq status chip (มุมบนขวาของ cpanel) -->
+        <div id="groqChip" style="position:absolute;top:10px;right:10px;z-index:10;
+             display:flex;align-items:center;gap:6px">
+          <span class="groq-status" id="groqStatus" style="font-size:.68rem;
+            background:rgba(255,255,255,.85);padding:3px 9px;border-radius:12px;
+            border:1px solid var(--bdr);backdrop-filter:blur(4px)">⚙️ ยังไม่ตั้งค่า Groq</span>
+          <button onclick="showGroqEdit()" title="ตั้งค่า Groq API Key"
+            style="width:28px;height:28px;border-radius:50%;border:1.5px solid var(--bdr);
+            background:rgba(255,255,255,.85);cursor:pointer;font-size:.8rem;
+            display:flex;align-items:center;justify-content:center;
+            backdrop-filter:blur(4px);transition:.15s;flex-shrink:0"
+            id="groqEditBtn" onmouseover="this.style.borderColor='var(--acc)'"
+            onmouseout="this.style.borderColor='var(--bdr)'">⚙️</button>
+        </div>
+
+        <!-- Modal แก้ไข Groq Key -->
+        <div id="groqModal" style="display:none;position:fixed;inset:0;z-index:600;
+             background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:20px">
+          <div style="background:var(--sur);border-radius:var(--r);padding:20px;
+               width:100%;max-width:420px;box-shadow:var(--shm)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <span style="font-size:1rem;font-weight:700">🤖 ตั้งค่า Groq API Key</span>
+              <button onclick="hideGroqEdit()" style="background:none;border:none;
+                font-size:1.2rem;cursor:pointer;color:var(--t2);padding:4px">✕</button>
+            </div>
+            <div style="font-size:.78rem;color:var(--t2);margin-bottom:10px;line-height:1.6">
+              สมัครฟรีที่ <strong>console.groq.com</strong><br>
+              API Keys → Create API Key → คัดลอกมาวางด้านล่าง
+            </div>
+            <input type="password" id="groqKey"
+              placeholder="gsk_xxxxxxxxxxxxxxxxxxxx"
+              autocomplete="off" spellcheck="false"
+              style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:.82rem;
+              background:var(--s2);border:1.5px solid var(--bdr);border-radius:var(--rs);
+              color:var(--txt);padding:10px 12px;outline:none;margin-bottom:12px;
+              min-height:44px;box-sizing:border-box">
+            <div style="display:flex;gap:8px">
+              <button onclick="saveGroqKey()"
+                style="flex:1;font-family:'Sarabun',sans-serif;font-size:.9rem;font-weight:700;
+                background:var(--acc);color:#fff;border:none;border-radius:var(--rs);
+                padding:12px;cursor:pointer;min-height:var(--touch);transition:.15s">
+                💾 บันทึก
+              </button>
+              <button onclick="hideGroqEdit()"
+                style="font-family:'Sarabun',sans-serif;font-size:.9rem;font-weight:600;
+                background:var(--s2);color:var(--t2);border:1.5px solid var(--bdr);
+                border-radius:var(--rs);padding:12px 16px;cursor:pointer;
+                min-height:var(--touch);transition:.15s">
+                ยกเลิก
+              </button>
+            </div>
+            <div id="groqModalStatus" style="margin-top:10px;font-size:.78rem;
+              text-align:center;min-height:1.2em"></div>
+          </div>
         </div>
         <!-- Retro date picker -->
         <div class="retro-bar" id="retroBar">
@@ -484,7 +532,7 @@ tr.rp{background:rgba(30,142,62,.04)}tr.ra{background:rgba(217,48,37,.04)}tr.rl{
           <span class="retro-badge" id="retroBadge">📅 ย้อนหลัง</span>
           <button class="btn-retro-clear" id="retroClear" onclick="clearRetro()" style="display:none">✕ กลับวันนี้</button>
         </div>
-        <div class="cpanel">
+        <div class="cpanel" style="position:relative">
           <div id="devInfo" style="display:none"></div>
           <div id="micBanner" style="display:none"></div>
 
@@ -833,9 +881,9 @@ window.addEventListener('load', () => {
   const savedKey = localStorage.getItem('groq_api_key') || '';
   if (savedKey) {
     groqApiKey = savedKey;
-    document.getElementById('groqKey').value = savedKey;
-    setGroqStatus('ok', '✅ พร้อมใช้งาน');
     groqMode = true;
+    // ตั้ง status หลัง DOM โหลดเสร็จ
+    setTimeout(() => setGroqStatus('ok', '✅ Groq Whisper พร้อม'), 100);
   }
 
   // Retro date picker
@@ -1274,22 +1322,28 @@ function startSession(){
   document.getElementById('skipBtn').disabled=false;
   document.getElementById('prevBtn').disabled=false;
   document.getElementById('cprog').style.display='flex';
-  if(PTT_MODE) document.getElementById('pttBtn').disabled=false;
-  if(IS_DESKTOP && groqMode){
+
+  if (PTT_MODE && groqMode) {
+    // แท็บเล็ต/มือถือ + Groq → auto-listen ไม่ต้องกดค้าง
+    document.getElementById('pttWrap').style.display='none';
+    document.getElementById('tipText').textContent='🤖 ระบบฟังอัตโนมัติ — ให้นักเรียนพูดได้เลย ไม่ต้องกดปุ่ม';
+    startGroqAutoListen();
+  } else if (PTT_MODE) {
+    document.getElementById('pttBtn').disabled=false;
+  } else if (IS_DESKTOP && groqMode) {
     document.getElementById('pttWrap').style.display='flex';
     document.getElementById('tipText').textContent='กด ▶ → กดค้าง 🎤 ขณะนักเรียนพูด → Groq แปลงอัตโนมัติ';
-  } else if(IS_DESKTOP && groqMode){
-    document.getElementById('pttWrap').style.display='flex';
-    document.getElementById('tipText').textContent='กด ▶ → กดค้าง 🎤 ขณะนักเรียนพูด → Groq แปลงอัตโนมัติ';
-  } else if(IS_DESKTOP){
+  } else if (IS_DESKTOP) {
     document.getElementById('waveIdle').style.display='none';
     document.getElementById('waveBars').style.display='flex';
   }
+
   let fi=students.findIndex(s=>s._st==='pending'); if(fi>=0)callIdx=fi;
   callStudent(callIdx);
 }
 function stopSession(){
   sessionOn=false; clearTimer(); stopRecog();
+  stopGroqAutoListen();
   const btn=document.getElementById('callBtn'); btn.classList.remove('on'); btn.textContent='▶';
   document.getElementById('skipBtn').disabled=true;
   document.getElementById('prevBtn').disabled=true;
@@ -1309,16 +1363,22 @@ function callStudent(idx){
   document.getElementById('cbox').className='cbox waiting';
   document.getElementById('clbl').textContent='กำลังเรียก ('+s.no+'/'+students.length+')';
   document.getElementById('cname').textContent=s.name;
-  document.getElementById('cheard').textContent=PTT_MODE?'กดค้างปุ่ม 🎤 ขณะนักเรียนพูด':'รอการตอบ…';
+  const isAutoListen = PTT_MODE && groqMode;
+  document.getElementById('cheard').textContent = isAutoListen ? '🤖 กำลังฟัง…' :
+                                                   PTT_MODE ? 'กดค้างปุ่ม 🎤 ขณะนักเรียนพูด' : 'รอการตอบ…';
   const done=students.filter(x=>x._st!=='pending').length;
   document.getElementById('progTxt').textContent=done+'/'+students.length;
   document.getElementById('progFill').style.width=(done/students.length*100)+'%';
-  setStatus('🔊 เรียก "'+s.name+'" — '+(PTT_MODE?'กดค้าง 🎤 เพื่อฟัง':'รอการตอบ'),'w');
+  setStatus('🔊 เรียก "'+s.name+'" — '+(isAutoListen?'กำลังฟังอัตโนมัติ':PTT_MODE?'กดค้าง 🎤 เพื่อฟัง':'รอการตอบ'),'w');
   document.getElementById('confrow').classList.add('show');
   document.getElementById('confName').textContent=s.name;
   renderList();
   const el=document.getElementById('si'+s.no); if(el)el.scrollIntoView({behavior:'smooth',block:'nearest'});
-  if(IS_DESKTOP && groqMode){
+
+  if (isAutoListen) {
+    // ต่อ cycle การฟังอัตโนมัติสำหรับคนถัดไป
+    runAutoListenCycle();
+  } else if(IS_DESKTOP && groqMode){
     setStatus('🎤 กดค้างปุ่ม 🎤 แล้วให้นักเรียนพูด','w');
   } else if(IS_DESKTOP&&SR_OK){ startRecog(); clearTimer();
     listenTmr=setTimeout(()=>{
@@ -1332,10 +1392,11 @@ function callStudent(idx){
     },8000);
   }
 }
-function goNext(){clearTimer();stopRecog();callStudent(callIdx+1);}
-function goPrev(){if(!sessionOn)return;clearTimer();stopRecog();callStudent(Math.max(0,callIdx-1));}
+function goNext(){clearTimer();stopRecog();autoListenCycleId++;callStudent(callIdx+1);}
+function goPrev(){if(!sessionOn)return;clearTimer();stopRecog();autoListenCycleId++;callStudent(Math.max(0,callIdx-1));}
 function goSkip(){
   if(!sessionOn||callIdx<0)return;
+  autoListenCycleId++; // ยกเลิก cycle เก่าก่อนข้าม
   const s=students[callIdx]; s._st='absent'; renderList(); updateStats();
   saveRecord(s.name,'absent','(ข้าม)'); toast('⏭ ข้าม — '+s.name+' นับว่าขาด'); goNext();
 }
@@ -1468,8 +1529,8 @@ function clearTimer(){if(listenTmr){clearTimeout(listenTmr);listenTmr=null;}}
    PROCESS RESPONSE
 ════════════════════════════════════════════════════════ */
 function processResponse(txts){
-  if(!sessionOn||callIdx<0||callIdx>=students.length)return;
-  const s=students[callIdx]; if(s._st!=='pending')return;
+  if(!sessionOn||callIdx<0||callIdx>=students.length)return false;
+  const s=students[callIdx]; if(s._st!=='pending')return false;
   for(const t of txts){
     const h=t.toLowerCase().trim();
     let matched=null;
@@ -1484,14 +1545,15 @@ function processResponse(txts){
       document.getElementById('cheard').textContent=lbl+' — ได้ยิน: "'+t+'"';
       setStatus(lbl+' — '+s.name,'ok'); toast(lbl+' — '+s.name);
       const pb=document.getElementById('pttBtn');
-      pb.classList.remove('pressing','listening');
-      document.getElementById('pttIcon').textContent='🎤';
-      document.getElementById('pttLabel').textContent='กดค้างเพื่อพูด';
-      document.getElementById('waveBars').style.display='none';
-      document.getElementById('waveIdle').style.display='';
-      setTimeout(goNext,1000); return;
+      if(pb){ pb.classList.remove('pressing','listening'); }
+      const pi=document.getElementById('pttIcon'); if(pi) pi.textContent='🎤';
+      const pl=document.getElementById('pttLabel'); if(pl) pl.textContent='กดค้างเพื่อพูด';
+      // ถ้าเป็น auto-listen mode → ไปคนต่อไปแล้ว runAutoListenCycle จะถูกเรียกจาก callStudent
+      setTimeout(goNext,1000);
+      return true;
     }
   }
+  return false;
 }
 
 /* ════════════════════════════════════════════════════════
@@ -1502,15 +1564,34 @@ function processResponse(txts){
 ════════════════════════════════════════════════════════ */
 
 function setGroqStatus(state, msg) {
-  const bar = document.getElementById('groqBar');
-  const lbl = document.getElementById('groqLbl');
-  const st  = document.getElementById('groqStatus');
-  bar.className = 'groq-bar ' + (state==='ok'?'ok':state==='err'?'err':'');
-  st.className  = 'groq-status ' + state;
-  st.textContent = msg;
-  if(state==='ok') lbl.textContent = '🤖 Groq Whisper';
-  else if(state==='err') lbl.textContent = '🤖 Groq API Key';
-  else lbl.textContent = '🤖 Groq API Key';
+  const chip = document.getElementById('groqStatus');
+  if (!chip) return;
+  chip.textContent = msg;
+  chip.style.background = state==='ok'  ? 'rgba(230,244,234,.95)' :
+                          state==='err' ? 'rgba(252,232,230,.95)' :
+                          state==='wait'? 'rgba(254,247,224,.95)' :
+                                          'rgba(255,255,255,.85)';
+  chip.style.borderColor = state==='ok'  ? 'var(--gbr)' :
+                           state==='err' ? 'var(--rbr)' :
+                           state==='wait'? '#ffe082'    : 'var(--bdr)';
+  chip.style.color = state==='ok'  ? 'var(--grn)' :
+                     state==='err' ? 'var(--red)'  :
+                     state==='wait'? 'var(--amb)'  : 'var(--t2)';
+  const ms = document.getElementById('groqModalStatus');
+  if (ms) { ms.textContent = msg; ms.style.color = state==='ok'?'var(--grn)':state==='err'?'var(--red)':'var(--amb)'; }
+}
+
+function showGroqEdit() {
+  const modal = document.getElementById('groqModal');
+  modal.style.display = 'flex';
+  if (groqApiKey) document.getElementById('groqKey').value = groqApiKey;
+  setTimeout(()=>document.getElementById('groqKey').focus(), 100);
+  document.getElementById('groqModalStatus').textContent = '';
+}
+
+function hideGroqEdit() {
+  document.getElementById('groqModal').style.display = 'none';
+  document.getElementById('groqModalStatus').textContent = '';
 }
 
 function saveGroqKey() {
@@ -1518,7 +1599,6 @@ function saveGroqKey() {
   if (!key) { setGroqStatus('err','❌ กรุณากรอก Key ก่อน'); return; }
   if (!key.startsWith('gsk_')) { setGroqStatus('err','❌ Key ต้องขึ้นต้นด้วย gsk_'); return; }
   setGroqStatus('wait','⏳ กำลังตรวจสอบ…');
-  // ทดสอบ Key โดย list models
   fetch('https://api.groq.com/openai/v1/models', {
     headers: { 'Authorization': 'Bearer ' + key }
   }).then(r => {
@@ -1526,10 +1606,10 @@ function saveGroqKey() {
       groqApiKey = key;
       groqMode = true;
       localStorage.setItem('groq_api_key', key);
-      setGroqStatus('ok','✅ พร้อมใช้งาน');
-      toast('✅ Groq API Key บันทึกแล้ว — ใช้ Whisper แทน Web Speech');
-      // อัปเดต mic pill
+      setGroqStatus('ok','✅ Groq Whisper พร้อมใช้');
       setPill('ok','🤖 Groq Whisper พร้อม');
+      toast('✅ บันทึก Groq Key แล้ว');
+      setTimeout(hideGroqEdit, 1200);
     } else {
       setGroqStatus('err','❌ Key ไม่ถูกต้อง ('+r.status+')');
       groqMode = false;
@@ -1555,6 +1635,79 @@ async function transcribeWithGroq(audioBlob) {
   if (!res.ok) throw new Error('Groq HTTP ' + res.status);
   const data = await res.json();
   return data.text || '';
+}
+
+/* ════════════════════════════════════════════════════════
+   GROQ AUTO-LISTEN — อัดเสียงเป็นช่วงๆ อัตโนมัติ ไม่ต้องกดค้าง
+   ใช้บนแท็บเล็ต/มือถือเมื่อเป็น Groq mode
+════════════════════════════════════════════════════════ */
+let autoListenActive = false;
+let autoListenStream  = null;
+const AUTO_CHUNK_MS = 3000; // อัดทีละ 3 วินาที
+
+async function startGroqAutoListen() {
+  if (autoListenActive) return;
+  if (!groqApiKey) { toast('❌ กรุณาตั้งค่า Groq API Key ก่อน'); return; }
+  try {
+    autoListenStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    autoListenActive = true;
+    document.getElementById('waveIdle').style.display = 'none';
+    document.getElementById('waveBars').style.display = 'flex';
+    runAutoListenCycle();
+  } catch(e) {
+    toast('❌ เปิดไมค์ไม่ได้: ' + e.message);
+  }
+}
+
+function stopGroqAutoListen() {
+  autoListenActive = false;
+  if (autoListenStream) {
+    autoListenStream.getTracks().forEach(t => t.stop());
+    autoListenStream = null;
+  }
+  document.getElementById('waveBars').style.display = 'none';
+  document.getElementById('waveIdle').style.display = '';
+}
+
+let autoListenCycleId = 0; // ป้องกัน cycle เก่าทำงานซ้ำหลัง callIdx เปลี่ยน
+
+function runAutoListenCycle() {
+  if (!autoListenActive || !sessionOn) { stopGroqAutoListen(); return; }
+  if (callIdx < 0 || callIdx >= students.length) { stopGroqAutoListen(); return; }
+
+  const myCycleId = ++autoListenCycleId; // cycle ID ของรอบนี้
+  const myCallIdx  = callIdx;
+
+  if (students[callIdx]._st !== 'pending') {
+    setTimeout(() => { if (myCycleId === autoListenCycleId) runAutoListenCycle(); }, 300);
+    return;
+  }
+
+  const chunks = [];
+  let rec;
+  try {
+    rec = new MediaRecorder(autoListenStream, { mimeType: 'audio/webm' });
+  } catch(e) {
+    toast('❌ เบราว์เซอร์นี้ไม่รองรับการอัดเสียง'); stopGroqAutoListen(); return;
+  }
+  rec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+  rec.onstop = async () => {
+    // ถ้า cycle นี้ถูกแทนที่แล้ว (เช่นกดข้าม/แมนนวลไปแล้ว) → หยุดเงียบๆ
+    if (!autoListenActive || myCycleId !== autoListenCycleId) return;
+    const blob = new Blob(chunks, { type: 'audio/webm' });
+    try {
+      const text = await transcribeWithGroq(blob);
+      if (myCycleId !== autoListenCycleId) return; // เปลี่ยนคนไปแล้วระหว่างรอ Groq ตอบ
+      if (text && text.trim()) {
+        document.getElementById('cheard').textContent = 'ได้ยิน: "' + text + '"';
+        const matched = processResponse([text]);
+        if (matched) return; // processResponse จะ goNext → callStudent จะเรียก cycle ใหม่เอง
+      }
+    } catch(e) { /* เงียบไว้ ไม่ toast รัวๆ ระหว่าง auto-listen */ }
+    if (autoListenActive && myCycleId === autoListenCycleId) runAutoListenCycle();
+  };
+  rec.start();
+  setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, AUTO_CHUNK_MS);
 }
 
 // PTT สำหรับ Groq mode — อัดเสียงขณะกดค้าง
